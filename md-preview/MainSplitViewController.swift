@@ -48,6 +48,13 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.find(query, backwards: backwards)
     }
 
+    // Custom selector (instead of `print:`) so AppKit's inherited
+    // NSView/NSWindow `print:` doesn't intercept higher in the responder chain
+    // and print the sidebar / whole window contents.
+    @IBAction func printMarkdown(_ sender: Any?) {
+        contentViewController?.printDocument()
+    }
+
     var isInspectorVisible: Bool {
         !(splitViewItems.last?.isCollapsed ?? true)
     }
