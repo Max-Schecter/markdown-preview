@@ -15,6 +15,9 @@ extension NSToolbarItem.Identifier {
     static let share = NSToolbarItem.Identifier("Share")
     static let search = NSToolbarItem.Identifier("Search")
     static let sidebarMenu = NSToolbarItem.Identifier("SidebarMenu")
+    static let printDocument = NSToolbarItem.Identifier("PrintDocument")
+    static let copyMarkdown = NSToolbarItem.Identifier("CopyMarkdown")
+    static let zoom = NSToolbarItem.Identifier("Zoom")
 }
 
 @main
@@ -37,6 +40,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     private weak var openWithItem: NSMenuToolbarItem?
     private weak var inspectorItem: NSToolbarItem?
     private weak var inspectorButton: NSButton?
+    private weak var copyItem: NSToolbarItem?
+    private var copyFeedbackWork: DispatchWorkItem?
     private weak var searchField: NSSearchField?
     private weak var sidebarMenu: NSMenu?
     private weak var sidebarPopUpButton: NSPopUpButton?
@@ -78,6 +83,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
 
         installFindBar()
         installSidebarViewMenuItems()
+        installGoMenu()
+        installZoomMenuItemIcons()
 
         hasLaunched = true
 
@@ -174,7 +181,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
             .sidebarMenu,
             .sidebarTrackingSeparator,
             .openWith,
-            .flexibleSpace,
+            .space,
+            .zoom,
             .inspector,
             .share,
             .search
@@ -190,7 +198,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
             .openWith,
             .inspector,
             .share,
-            .search
+            .search,
+            .printDocument,
+            .copyMarkdown,
+            .zoom
         ]
     }
 
@@ -203,6 +214,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         case .inspector: return makeInspectorItem()
         case .share: return makeShareItem()
         case .search: return makeSearchItem()
+        case .printDocument: return makePrintItem()
+        case .copyMarkdown: return makeCopyItem()
+        case .zoom: return makeZoomItem()
         default: return nil
         }
     }
@@ -316,6 +330,107 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         split.showSidebar()
     }
 
+    private func installGoMenu() {
+        guard let mainMenu = NSApp.mainMenu else { return }
+
+        func arrow(_ functionKey: Int) -> String {
+            UnicodeScalar(functionKey).map { String(Character($0)) } ?? ""
+        }
+
+        // Uniform point size keeps narrow glyphs (arrow.up/down) aligned with
+        // wider ones (arrow.up.document, chevron.up.circle) in the icon column.
+        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+
+        func makeItem(_ title: String,
+                      action: Selector,
+                      keyEquivalent: String,
+                      modifiers: NSEvent.ModifierFlags,
+                      symbol: String) -> NSMenuItem {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+            item.keyEquivalentModifierMask = modifiers
+            if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)?
+                .withSymbolConfiguration(symbolConfig) {
+                image.isTemplate = true
+                item.image = image
+            }
+            return item
+        }
+
+        let menu = NSMenu(title: "Go")
+
+        menu.addItem(makeItem("Up",
+                              action: #selector(NSResponder.scrollLineUp(_:)),
+                              keyEquivalent: arrow(NSUpArrowFunctionKey),
+                              modifiers: [],
+                              symbol: "arrow.up"))
+        menu.addItem(makeItem("Down",
+                              action: #selector(NSResponder.scrollLineDown(_:)),
+                              keyEquivalent: arrow(NSDownArrowFunctionKey),
+                              modifiers: [],
+                              symbol: "arrow.down"))
+        menu.addItem(makeItem("Page Up",
+                              action: #selector(NSResponder.scrollPageUp(_:)),
+                              keyEquivalent: arrow(NSPageUpFunctionKey),
+                              modifiers: [],
+                              symbol: "chevron.up.square"))
+        menu.addItem(makeItem("Page Down",
+                              action: #selector(NSResponder.scrollPageDown(_:)),
+                              keyEquivalent: arrow(NSPageDownFunctionKey),
+                              modifiers: [],
+                              symbol: "chevron.down.square"))
+
+        menu.addItem(.separator())
+
+        menu.addItem(makeItem("Previous Item",
+                              action: #selector(MarkdownWebView.mdScrollPreviousHeading(_:)),
+                              keyEquivalent: arrow(NSUpArrowFunctionKey),
+                              modifiers: .option,
+                              symbol: "arrow.up.document"))
+        menu.addItem(makeItem("Next Item",
+                              action: #selector(MarkdownWebView.mdScrollNextHeading(_:)),
+                              keyEquivalent: arrow(NSDownArrowFunctionKey),
+                              modifiers: .option,
+                              symbol: "arrow.down.document"))
+
+        menu.addItem(.separator())
+
+        menu.addItem(makeItem("Top of Document",
+                              action: #selector(NSResponder.scrollToBeginningOfDocument(_:)),
+                              keyEquivalent: arrow(NSUpArrowFunctionKey),
+                              modifiers: .command,
+                              symbol: "arrow.up.to.line"))
+        menu.addItem(makeItem("Bottom of Document",
+                              action: #selector(NSResponder.scrollToEndOfDocument(_:)),
+                              keyEquivalent: arrow(NSDownArrowFunctionKey),
+                              modifiers: .command,
+                              symbol: "arrow.down.to.line"))
+
+        let goItem = NSMenuItem(title: "Go", action: nil, keyEquivalent: "")
+        goItem.submenu = menu
+
+        let insertIndex = mainMenu.items.firstIndex(where: { $0.title == "Window" })
+            ?? mainMenu.items.count
+        mainMenu.insertItem(goItem, at: insertIndex)
+    }
+
+    private func installZoomMenuItemIcons() {
+        guard let viewMenu = NSApp.mainMenu?.items
+            .first(where: { $0.title == "View" })?.submenu else { return }
+        let icons: [(title: String, symbol: String)] = [
+            ("Actual Size", "magnifyingglass"),
+            ("Zoom In", "plus.magnifyingglass"),
+            ("Zoom Out", "minus.magnifyingglass")
+        ]
+        for (title, symbol) in icons {
+            guard let item = viewMenu.items.first(where: { $0.title == title }),
+                  let image = NSImage(systemSymbolName: symbol,
+                                      accessibilityDescription: title)
+            else { continue }
+            image.isTemplate = true
+            item.image = image
+        }
+    }
+
     private func installSidebarViewMenuItems() {
         guard let viewMenu = NSApp.mainMenu?.items
             .first(where: { $0.title == "View" })?.submenu else { return }
@@ -385,8 +500,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     private func makeInspectorItem() -> NSToolbarItem {
         let item = NSToolbarItem(itemIdentifier: .inspector)
         item.label = "Inspector"
-        item.paletteLabel = "Inspector"
-        item.toolTip = "Show or hide inspector"
+        item.paletteLabel = "Get Info"
+        item.toolTip = "Show the inspector"
 
         let button = NSButton(image: inspectorImage(),
                               target: self,
@@ -422,6 +537,101 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         item.toolTip = "Share document"
         item.delegate = self
         return item
+    }
+
+    private func makePrintItem() -> NSToolbarItem {
+        let item = NSToolbarItem(itemIdentifier: .printDocument)
+        item.label = "Print"
+        item.paletteLabel = "Print"
+        item.toolTip = "Print document"
+        item.image = NSImage(systemSymbolName: "printer",
+                             accessibilityDescription: "Print")
+        item.isBordered = true
+        item.action = #selector(MainSplitViewController.printMarkdown(_:))
+        return item
+    }
+
+    private func makeCopyItem() -> NSToolbarItem {
+        let item = NSToolbarItem(itemIdentifier: .copyMarkdown)
+        item.label = "Copy"
+        item.paletteLabel = "Copy"
+        item.toolTip = "Copy Markdown source to clipboard"
+        item.image = copyIdleImage()
+        item.isBordered = true
+        item.target = self
+        item.action = #selector(copyMarkdownAction(_:))
+        copyItem = item
+        return item
+    }
+
+    @objc private func copyMarkdownAction(_ sender: Any?) {
+        guard let markdown = currentMarkdown, !markdown.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(markdown, forType: .string)
+        flashCopyFeedback()
+    }
+
+    private static let copyFeedbackDuration: TimeInterval = 1.2
+
+    private func flashCopyFeedback() {
+        guard let item = copyItem else { return }
+        copyFeedbackWork?.cancel()
+        item.image = copyConfirmedImage()
+        let work = DispatchWorkItem { [weak self] in
+            self?.copyItem?.image = self?.copyIdleImage()
+        }
+        copyFeedbackWork = work
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Self.copyFeedbackDuration, execute: work
+        )
+    }
+
+    private func copyIdleImage() -> NSImage? {
+        NSImage(systemSymbolName: "document.on.document",
+                accessibilityDescription: "Copy")
+    }
+
+    private func copyConfirmedImage() -> NSImage? {
+        NSImage(systemSymbolName: "checkmark",
+                accessibilityDescription: "Copied")
+    }
+
+    private func makeZoomItem() -> NSToolbarItemGroup {
+        let smaller = NSImage(systemSymbolName: "textformat.size.smaller",
+                              accessibilityDescription: "Zoom Out") ?? NSImage()
+        let larger = NSImage(systemSymbolName: "textformat.size.larger",
+                             accessibilityDescription: "Zoom In") ?? NSImage()
+        let group = NSToolbarItemGroup(
+            itemIdentifier: .zoom,
+            images: [smaller, larger],
+            selectionMode: .momentary,
+            labels: ["Zoom Out", "Zoom In"],
+            target: self,
+            action: #selector(zoomSegmentAction(_:))
+        )
+        group.label = "Zoom"
+        group.paletteLabel = "Zoom"
+        // .expanded keeps the two-segment "A A" pair visible like Books / Reader,
+        // instead of collapsing into a single button + menu when space is tight.
+        group.controlRepresentation = .expanded
+        if let segmented = group.view as? NSSegmentedControl {
+            segmented.setToolTip("Zoom Out", forSegment: 0)
+            segmented.setToolTip("Zoom In", forSegment: 1)
+        }
+        return group
+    }
+
+    @objc private func zoomSegmentAction(_ sender: NSToolbarItemGroup) {
+        guard let split = window.contentViewController as? MainSplitViewController else { return }
+        switch sender.selectedIndex {
+        case 0: split.zoomOutDocument(sender)
+        case 1: split.zoomInDocument(sender)
+        default: break
+        }
     }
 
     private func inspectorImage() -> NSImage {
