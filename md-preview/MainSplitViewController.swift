@@ -10,6 +10,7 @@ final class MainSplitViewController: NSSplitViewController {
     private static let didSeedKey = "MainSplitView.didSeedInitialState"
 
     var onSelectFile: ((URL) -> Void)?
+    var onRenderedTableMarkdownChange: ((String) -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -48,9 +49,25 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.activeHeadingDidChange = { [weak self] headingID in
             self?.sidebarViewController?.setActiveHeading(headingID)
         }
+        contentViewController?.markdownDidChangeFromRenderedTable = { [weak self] markdown in
+            self?.sidebarViewController?.display(
+                markdown: markdown,
+                fileName: self?.currentFileName ?? "",
+                fileURL: self?.currentFileURL
+            )
+            self?.inspectorViewController?.display(
+                metadata: DocumentMetadata.make(url: self?.currentFileURL, markdown: markdown)
+            )
+            self?.onRenderedTableMarkdownChange?(markdown)
+        }
     }
 
+    private var currentFileName = ""
+    private var currentFileURL: URL?
+
     func display(markdown: String, fileName: String, url: URL?, assetBaseURL: URL?) {
+        currentFileName = fileName
+        currentFileURL = url
         contentViewController?.display(markdown: markdown, assetBaseURL: assetBaseURL)
         sidebarViewController?.display(markdown: markdown, fileName: fileName, fileURL: url)
         inspectorViewController?.display(metadata: DocumentMetadata.make(url: url, markdown: markdown))
@@ -60,6 +77,8 @@ final class MainSplitViewController: NSSplitViewController {
     /// the preview, scroll position, and active-heading highlight stay
     /// put.
     func openFileURLDidChange(_ newURL: URL, markdown: String) {
+        currentFileName = newURL.lastPathComponent
+        currentFileURL = newURL
         sidebarViewController?.openFileURLDidChange(newURL)
         inspectorViewController?.display(metadata: DocumentMetadata.make(url: newURL, markdown: markdown))
     }

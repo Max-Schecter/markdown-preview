@@ -31,9 +31,21 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     let webView: WKWebView
     var heightDidChange: ((CGFloat) -> Void)?
     var fragmentLinkActivated: ((String) -> Void)?
+    var markdownDidChangeFromRenderedTable: ((String) -> Void)?
     private let assetScheme = MarkdownAssetScheme()
     private var currentAssetBase: URL?
     private let messageBridge = HostBridge()
+    private var tableMenuContext: TableMenuContext?
+    fileprivate var lastRightMouseDownEvent: NSEvent?
+    fileprivate var suppressDefaultContextMenuUntil: TimeInterval = 0
+
+    private struct TableMenuContext {
+        let tableIndex: Int
+        let rowIndex: Int
+        let columnIndex: Int
+        let clientX: CGFloat
+        let clientY: CGFloat
+    }
 
     private struct RendererFingerprint: Equatable {
         let math: Bool
@@ -89,6 +101,7 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     private static let disableContextMenuScript = WKUserScript(
         source: """
         document.addEventListener('contextmenu', event => {
+            if (event.target && event.target.closest && event.target.closest('[data-md-table-editable="1"]')) return;
             const selection = window.getSelection();
             if (selection && selection.toString().trim().length > 0) return;
             event.preventDefault();
@@ -155,11 +168,15 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     /// Empties the visible article without unloading the page, so the next
     /// `display()` still hits the fast-path.
     func clearContent() {
+        tableMenuContext = nil
+        lastRightMouseDownEvent = nil
         guard isPageReady else { return }
         webView.evaluateJavaScript("window.MdPreview && MdPreview.update('');") { _, _ in }
     }
 
     func display(markdown: String, assetBaseURL: URL? = nil) {
+        tableMenuContext = nil
+        lastRightMouseDownEvent = nil
         currentMarkdown = markdown
         assetScheme.setBaseURL(assetBaseURL)
         currentAssetBase = assetBaseURL
@@ -248,8 +265,153 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+        case "tableEdit":
+            handleTableEditMessage(dict)
+        case "tableContextMenu":
+            handleTableContextMenuMessage(dict)
         default:
             break
+        }
+    }
+
+    private func handleTableEditMessage(_ dict: [String: Any]) {
+        guard let tableIndex = (dict["tableIndex"] as? NSNumber)?.intValue,
+              let rawRows = dict["rows"] as? [[Any]]
+        else { return }
+
+        let rows = rawRows.map { row in
+            row.map { cell in
+                if let string = cell as? String { return string }
+                return String(describing: cell)
+            }
+        }
+        let dirtyRows = (dict["dirtyRows"] as? [[Any]])?.map { row in
+            row.map { cell in
+                if let bool = cell as? Bool { return bool }
+                if let number = cell as? NSNumber { return number.boolValue }
+                return true
+            }
+        }
+
+        let snapshot = MarkdownTableEditor.Snapshot(tableIndex: tableIndex,
+                                                    rows: rows,
+                                                    dirtyRows: dirtyRows)
+        guard let markdown = currentMarkdown,
+              let updated = MarkdownTableEditor.replacingTable(in: markdown, with: snapshot),
+              updated != markdown
+        else { return }
+
+        currentMarkdown = updated
+        markdownDidChangeFromRenderedTable?(updated)
+    }
+
+    private func handleTableContextMenuMessage(_ dict: [String: Any]) {
+        guard let tableIndex = (dict["tableIndex"] as? NSNumber)?.intValue,
+              let rowIndex = (dict["rowIndex"] as? NSNumber)?.intValue,
+              let columnIndex = (dict["columnIndex"] as? NSNumber)?.intValue,
+              let clientX = dict["clientX"] as? NSNumber,
+              let clientY = dict["clientY"] as? NSNumber
+        else { return }
+
+        tableMenuContext = TableMenuContext(
+            tableIndex: tableIndex,
+            rowIndex: rowIndex,
+            columnIndex: columnIndex,
+            clientX: CGFloat(truncating: clientX),
+            clientY: CGFloat(truncating: clientY)
+        )
+        suppressDefaultContextMenuUntil = ProcessInfo.processInfo.systemUptime + 0.5
+        showTableContextMenu()
+    }
+
+    private func showTableContextMenu() {
+        guard let context = tableMenuContext else { return }
+
+        let menu = NSMenu()
+        menu.addItem(tableMenuItem("Insert Row Above", action: #selector(insertTableRowAbove(_:))))
+        menu.addItem(tableMenuItem("Insert Row Below", action: #selector(insertTableRowBelow(_:))))
+        menu.addItem(tableMenuItem("Delete Row", action: #selector(deleteTableRow(_:))))
+        menu.addItem(.separator())
+        menu.addItem(tableMenuItem("Insert Column Before", action: #selector(insertTableColumnBefore(_:))))
+        menu.addItem(tableMenuItem("Insert Column After", action: #selector(insertTableColumnAfter(_:))))
+        menu.addItem(tableMenuItem("Delete Column", action: #selector(deleteTableColumn(_:))))
+
+        if let event = matchingContextMenuEvent(for: context) {
+            NSMenu.popUpContextMenu(menu, with: event, for: webView)
+        } else {
+            let point = NSPoint(
+                x: context.clientX * webView.pageZoom,
+                y: webView.isFlipped
+                    ? context.clientY * webView.pageZoom
+                    : webView.bounds.height - (context.clientY * webView.pageZoom)
+            )
+            menu.popUp(positioning: nil, at: point, in: webView)
+        }
+        lastRightMouseDownEvent = nil
+    }
+
+    private func matchingContextMenuEvent(for context: TableMenuContext) -> NSEvent? {
+        guard let event = lastRightMouseDownEvent else { return nil }
+        let age = ProcessInfo.processInfo.systemUptime - event.timestamp
+        guard age >= 0, age < 1 else { return nil }
+
+        let eventPoint = webView.convert(event.locationInWindow, from: nil)
+        let expectedY = webView.isFlipped
+            ? context.clientY * webView.pageZoom
+            : webView.bounds.height - (context.clientY * webView.pageZoom)
+        let expected = NSPoint(x: context.clientX * webView.pageZoom, y: expectedY)
+        return hypot(eventPoint.x - expected.x, eventPoint.y - expected.y) < 32 ? event : nil
+    }
+
+    private func tableMenuItem(_ title: String, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func insertTableRowAbove(_ sender: Any?) {
+        performTableCommand("insertRowAbove")
+    }
+
+    @objc private func insertTableRowBelow(_ sender: Any?) {
+        performTableCommand("insertRowBelow")
+    }
+
+    @objc private func deleteTableRow(_ sender: Any?) {
+        performTableCommand("deleteRow")
+    }
+
+    @objc private func insertTableColumnBefore(_ sender: Any?) {
+        performTableCommand("insertColumnBefore")
+    }
+
+    @objc private func insertTableColumnAfter(_ sender: Any?) {
+        performTableCommand("insertColumnAfter")
+    }
+
+    @objc private func deleteTableColumn(_ sender: Any?) {
+        performTableCommand("deleteColumn")
+    }
+
+    private func performTableCommand(_ command: String) {
+        guard let context = tableMenuContext else { return }
+        let script = """
+        window.MdPreviewTables && window.MdPreviewTables.perform(
+            \(javaScriptStringLiteral(command)),
+            \(context.tableIndex),
+            \(context.rowIndex),
+            \(context.columnIndex)
+        );
+        """
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            defer { self?.tableMenuContext = nil }
+            if let error {
+                Logger.perf.debug("table command failed: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+            if let ok = result as? Bool, !ok {
+                Logger.perf.debug("table command rejected: \(command, privacy: .public)")
+            }
         }
     }
 
@@ -790,6 +952,10 @@ private final class NonScrollingWKWebView: WKWebView {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        if let owner = superview as? MarkdownWebView,
+           ProcessInfo.processInfo.systemUptime < owner.suppressDefaultContextMenuUntil {
+            return nil
+        }
         let menu = super.menu(for: event)
         menu?.removeWebKitReloadItems()
         return menu
@@ -798,6 +964,21 @@ private final class NonScrollingWKWebView: WKWebView {
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         menu.removeWebKitReloadItems()
         super.willOpenMenu(menu, with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        if let owner = superview as? MarkdownWebView {
+            owner.lastRightMouseDownEvent = event
+        }
+        super.rightMouseDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control),
+           let owner = superview as? MarkdownWebView {
+            owner.lastRightMouseDownEvent = event
+        }
+        super.mouseDown(with: event)
     }
 
     override func reload(_ sender: Any?) {
