@@ -772,6 +772,183 @@ nonisolated enum MarkdownHTML {
             });
         }
 
+        function tableCells(table) {
+            return Array.from(table.querySelectorAll('thead tr, tbody tr, :scope > tr')).map((row) =>
+                Array.from(row.children).filter((cell) => cell.matches('th, td'))
+            ).filter((row) => row.length > 0);
+        }
+
+        function serializeTable(table) {
+            return tableCells(table).map((row) => row.map((cell) => cell.textContent || ''));
+        }
+
+        function serializeDirtyRows(table) {
+            return tableCells(table).map((row) => row.map((cell) => cell.dataset.mdDirty === '1'));
+        }
+
+        function postTableEdit(table, force) {
+            const tableIndex = Number.parseInt(table.dataset.mdTableIndex || '-1', 10);
+            if (!Number.isInteger(tableIndex) || tableIndex < 0) return;
+            if (!force && table.dataset.mdTableDirty !== '1') return;
+            const rows = serializeTable(table);
+            const dirtyRows = serializeDirtyRows(table);
+            table.dataset.mdTableDirty = '0';
+            tableCells(table).forEach((row) => {
+                row.forEach((cell) => {
+                    cell.dataset.mdOriginalText = cell.textContent || '';
+                    cell.dataset.mdDirty = '0';
+                });
+            });
+            post({ kind: 'tableEdit', tableIndex, rows, dirtyRows });
+            pushHeight();
+        }
+
+        function makeEditableCell(cell, table, rowIndex, columnIndex) {
+            cell.dataset.mdTableEditable = '1';
+            cell.dataset.mdRowIndex = String(rowIndex);
+            cell.dataset.mdColumnIndex = String(columnIndex);
+            cell.setAttribute('contenteditable', 'plaintext-only');
+            cell.setAttribute('spellcheck', 'true');
+            cell.setAttribute('role', 'textbox');
+            if (cell.dataset.mdOriginalText === undefined) {
+                cell.dataset.mdOriginalText = cell.textContent || '';
+            }
+
+            if (cell.dataset.mdTableEditReady === '1') return;
+            cell.dataset.mdTableEditReady = '1';
+
+            cell.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    cell.blur();
+                }
+            });
+
+            cell.addEventListener('paste', (event) => {
+                event.preventDefault();
+                const text = (event.clipboardData || window.clipboardData)?.getData('text/plain') || '';
+                document.execCommand('insertText', false, text.replace(/[\\r\\n]+/g, ' '));
+            });
+
+            let timer = 0;
+            cell.addEventListener('input', () => {
+                if ((cell.textContent || '') === (cell.dataset.mdOriginalText || '')) return;
+                table.dataset.mdTableDirty = '1';
+                cell.dataset.mdDirty = '1';
+                clearTimeout(timer);
+                timer = setTimeout(() => postTableEdit(table, false), 120);
+            });
+            cell.addEventListener('blur', () => {
+                clearTimeout(timer);
+                if ((cell.textContent || '') !== (cell.dataset.mdOriginalText || '')) {
+                    table.dataset.mdTableDirty = '1';
+                    cell.dataset.mdDirty = '1';
+                }
+                postTableEdit(table, false);
+            });
+        }
+
+        function decorateTables() {
+            document.querySelectorAll('table[data-md-table-index]').forEach((table) => {
+                table.classList.add('md-editable-table');
+                const rows = tableCells(table);
+                rows.forEach((row, rowIndex) => {
+                    row.forEach((cell, columnIndex) => {
+                        makeEditableCell(cell, table, rowIndex, columnIndex);
+                    });
+                });
+            });
+        }
+
+        document.addEventListener('contextmenu', (event) => {
+            const cell = event.target && event.target.closest
+                ? event.target.closest('th[data-md-table-editable="1"], td[data-md-table-editable="1"]')
+                : null;
+            if (!cell) return;
+            const table = cell.closest('table[data-md-table-index]');
+            if (!table) return;
+            const tableIndex = Number.parseInt(table.dataset.mdTableIndex || '-1', 10);
+            const rowIndex = Number.parseInt(cell.dataset.mdRowIndex || '-1', 10);
+            const columnIndex = Number.parseInt(cell.dataset.mdColumnIndex || '-1', 10);
+            if (![tableIndex, rowIndex, columnIndex].every(Number.isInteger)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            post({
+                kind: 'tableContextMenu',
+                tableIndex,
+                rowIndex,
+                columnIndex,
+                clientX: event.clientX,
+                clientY: event.clientY
+            });
+        }, true);
+
+        window.MdPreviewTables = {
+            perform(command, tableIndex, rowIndex, columnIndex) {
+                const table = document.querySelector('table[data-md-table-index="' + tableIndex + '"]');
+                if (!table) return false;
+                const rows = tableCells(table);
+                if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= rows.length) return false;
+                const columnCount = Math.max(1, ...rows.map((row) => row.length));
+                if (!Number.isInteger(columnIndex) || columnIndex < 0 || columnIndex >= columnCount) return false;
+                const headerCell = rows[0] && rows[0][0] && rows[0][0].tagName === 'TH';
+
+                function newCell(forHeader) {
+                    const cell = document.createElement(forHeader ? 'th' : 'td');
+                    cell.textContent = '';
+                    cell.dataset.mdDirty = '1';
+                    return cell;
+                }
+
+                switch (command) {
+                case 'insertRowAbove':
+                case 'insertRowBelow': {
+                    const reference = rows[rowIndex] && rows[rowIndex][0] && rows[rowIndex][0].parentElement;
+                    const parent = reference ? reference.parentElement : table.querySelector('tbody') || table;
+                    const tr = document.createElement('tr');
+                    const forHeader = rowIndex === 0 && headerCell;
+                    for (let i = 0; i < columnCount; i += 1) tr.appendChild(newCell(forHeader));
+                    if (reference && command === 'insertRowAbove') {
+                        parent.insertBefore(tr, reference);
+                    } else if (reference && reference.nextSibling) {
+                        parent.insertBefore(tr, reference.nextSibling);
+                    } else {
+                        parent.appendChild(tr);
+                    }
+                    break;
+                }
+                case 'deleteRow': {
+                    if (rows.length <= 1) return false;
+                    const row = rows[rowIndex] && rows[rowIndex][0] && rows[rowIndex][0].parentElement;
+                    if (row) row.remove();
+                    break;
+                }
+                case 'insertColumnBefore':
+                case 'insertColumnAfter': {
+                    rows.forEach((row, r) => {
+                        const insertAt = command === 'insertColumnBefore' ? columnIndex : columnIndex + 1;
+                        const cell = newCell(r === 0 && headerCell);
+                        const reference = row[Math.min(insertAt, row.length)];
+                        const tr = row[0] && row[0].parentElement;
+                        if (tr) tr.insertBefore(cell, reference || null);
+                    });
+                    break;
+                }
+                case 'deleteColumn': {
+                    if (columnCount <= 1) return false;
+                    rows.forEach((row) => row[columnIndex]?.remove());
+                    break;
+                }
+                default:
+                    return false;
+                }
+
+                decorateTables();
+                postTableEdit(table, true);
+                return true;
+            }
+        };
+
         async function copyCodeBlock(button) {
             const wrap = button.parentElement;
             const code = wrap && wrap.querySelector('pre > code');
@@ -926,6 +1103,7 @@ nonisolated enum MarkdownHTML {
             }
             if (articleHTML) {
                 decorateCodeBlocks();
+                decorateTables();
                 for (const fn of reappliers) {
                     try { fn(); } catch (e) { /* one bad apple shouldn't block others */ }
                 }
@@ -951,6 +1129,7 @@ nonisolated enum MarkdownHTML {
             perfLog('start (DOM ready)');
             populateFromTemplate();
             decorateCodeBlocks();
+            decorateTables();
             pushHeight();
             try {
                 const ro = new ResizeObserver(pushHeight);
@@ -1964,6 +2143,21 @@ nonisolated enum MarkdownHTML {
         text-align: left;
     }
     th { font-weight: 600; }
+    th[data-md-table-editable="1"], td[data-md-table-editable="1"] {
+        outline: none;
+        cursor: default;
+        transition: background-color 120ms ease, box-shadow 120ms ease;
+        -webkit-user-modify: read-write-plaintext-only;
+        caret-color: AccentColor;
+    }
+    th[data-md-table-editable="1"]:hover, td[data-md-table-editable="1"]:hover {
+        cursor: text;
+        background: color-mix(in srgb, AccentColor 3%, transparent);
+    }
+    th[data-md-table-editable="1"]:focus, td[data-md-table-editable="1"]:focus {
+        background: color-mix(in srgb, AccentColor 5%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, AccentColor 42%, transparent);
+    }
 
     hr {
         border: 0;

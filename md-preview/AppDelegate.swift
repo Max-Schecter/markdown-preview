@@ -69,6 +69,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         split.onSelectFile = { [weak self] url in
             self?.present(url: url)
         }
+        split.onRenderedTableMarkdownChange = { [weak self] markdown in
+            self?.saveRenderedTableEdit(markdown)
+        }
         window.contentViewController = split
         window.setContentSize(NSSize(width: 1100, height: 720))
         window.center()
@@ -1218,8 +1221,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     }
 
     private func applyLoadedMarkdown(_ text: String, fileURL: URL) {
+        guard text != currentMarkdown else { return }
         currentMarkdown = text
         renderCurrentDocument(text: text, fileURL: fileURL)
+    }
+
+    private func saveRenderedTableEdit(_ markdown: String) {
+        guard let url = currentFileURL else { return }
+        currentMarkdown = markdown
+        Task { @concurrent [weak self] in
+            do {
+                try markdown.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                let nsError = error as NSError
+                await self?.applyRenderedTableSaveFailure(nsError)
+            }
+        }
+    }
+
+    private func applyRenderedTableSaveFailure(_ error: NSError) {
+        NSAlert(error: error).beginSheetModal(for: window)
     }
 
     private func applyLoadFailure(error: NSError, silentOnFailure: Bool) {

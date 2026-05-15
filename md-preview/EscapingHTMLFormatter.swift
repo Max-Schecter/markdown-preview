@@ -18,6 +18,7 @@ nonisolated struct EscapingHTMLFormatter: MarkupWalker {
     private var inTableHead = false
     private var tableColumnAlignments: [Table.ColumnAlignment?]?
     private var currentTableColumn = 0
+    private var tableIndex = 0
 
     init(options: HTMLFormatterOptions = []) {
         self.options = options
@@ -112,7 +113,8 @@ nonisolated struct EscapingHTMLFormatter: MarkupWalker {
     }
 
     mutating func visitTable(_ table: Table) {
-        result += "<table>\n"
+        result += "<table data-md-table-index=\"\(tableIndex)\">\n"
+        tableIndex += 1
         tableColumnAlignments = table.columnAlignments
         descendInto(table)
         tableColumnAlignments = nil
