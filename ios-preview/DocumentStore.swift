@@ -61,6 +61,12 @@ final class DocumentStore: ObservableObject {
         securityScopedURL = nil
         state = .empty
     }
+
+    func save(markdown: String) throws {
+        guard case .loaded(let document) = state else { return }
+        try markdown.write(to: document.url, atomically: true, encoding: .utf8)
+        state = .loaded(MarkdownDocument(url: document.url, markdown: markdown))
+    }
 }
 
 struct MarkdownDocument: Equatable, Identifiable {

@@ -7,6 +7,7 @@ import SwiftUI
 
 struct MarkdownDocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @EnvironmentObject private var documentStore: DocumentStore
 
     let document: MarkdownDocument
     @ObservedObject var webViewModel: MarkdownWebViewModel
@@ -17,9 +18,11 @@ struct MarkdownDocumentView: View {
         MarkdownPreviewWebView(
             markdown: document.markdown,
             assetBaseURL: document.assetBaseURL,
+            onMarkdownChange: saveMarkdown,
             model: webViewModel
         )
-        .ignoresSafeArea(.container, edges: .bottom)
+        .documentTopChromeTransition()
+        .ignoresSafeArea(.container, edges: [.top, .bottom])
         .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -33,6 +36,14 @@ struct MarkdownDocumentView: View {
         }
         .task(id: document.id) {
             webViewModel.clearError()
+        }
+    }
+
+    private func saveMarkdown(_ markdown: String) {
+        do {
+            try documentStore.save(markdown: markdown)
+        } catch {
+            webViewModel.report(error.localizedDescription)
         }
     }
 
@@ -74,6 +85,17 @@ struct MarkdownDocumentView: View {
             }
             .accessibilityLabel("Open Document")
             .accessibilityIdentifier("open-document")
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func documentTopChromeTransition() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            self
         }
     }
 }

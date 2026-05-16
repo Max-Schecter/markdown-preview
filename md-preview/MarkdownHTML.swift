@@ -807,7 +807,6 @@ nonisolated enum MarkdownHTML {
             cell.dataset.mdTableEditable = '1';
             cell.dataset.mdRowIndex = String(rowIndex);
             cell.dataset.mdColumnIndex = String(columnIndex);
-            cell.setAttribute('contenteditable', 'plaintext-only');
             cell.setAttribute('spellcheck', 'true');
             cell.setAttribute('role', 'textbox');
             if (cell.dataset.mdOriginalText === undefined) {
@@ -844,8 +843,18 @@ nonisolated enum MarkdownHTML {
                     table.dataset.mdTableDirty = '1';
                     cell.dataset.mdDirty = '1';
                 }
+                cell.removeAttribute('contenteditable');
                 postTableEdit(table, false);
             });
+        }
+
+        function activateEditableCell(cell) {
+            if (!cell || cell.dataset.mdTableEditable !== '1') return false;
+            if (cell.getAttribute('contenteditable') !== 'plaintext-only') {
+                cell.setAttribute('contenteditable', 'plaintext-only');
+            }
+            cell.focus({ preventScroll: true });
+            return true;
         }
 
         function decorateTables() {
@@ -860,28 +869,118 @@ nonisolated enum MarkdownHTML {
             });
         }
 
-        document.addEventListener('contextmenu', (event) => {
-            const cell = event.target && event.target.closest
-                ? event.target.closest('th[data-md-table-editable="1"], td[data-md-table-editable="1"]')
+        function tableContextFromPoint(target, clientX, clientY) {
+            const table = target && target.closest
+                ? target.closest('table[data-md-table-index]')
                 : null;
-            if (!cell) return;
-            const table = cell.closest('table[data-md-table-index]');
             if (!table) return;
+            let cell = target && target.closest
+                ? target.closest('th[data-md-table-editable="1"], td[data-md-table-editable="1"]')
+                : null;
+            if (!cell || !table.contains(cell)) {
+                cell = document.elementFromPoint(clientX, clientY)?.closest(
+                    'th[data-md-table-editable="1"], td[data-md-table-editable="1"]'
+                );
+            }
+            if (!cell || !table.contains(cell)) {
+                cell = table.querySelector('th[data-md-table-editable="1"], td[data-md-table-editable="1"]');
+            }
+            if (!cell) return;
             const tableIndex = Number.parseInt(table.dataset.mdTableIndex || '-1', 10);
             const rowIndex = Number.parseInt(cell.dataset.mdRowIndex || '-1', 10);
             const columnIndex = Number.parseInt(cell.dataset.mdColumnIndex || '-1', 10);
             if (![tableIndex, rowIndex, columnIndex].every(Number.isInteger)) return;
-            event.preventDefault();
-            event.stopPropagation();
+            return { tableIndex, rowIndex, columnIndex, clientX, clientY };
+        }
+
+        let tableActionSuppressionMS = 900;
+        let tableContextMenuDeduplicationMS = 900;
+        let editableTableCellSelector = 'th[data-md-table-editable="1"], td[data-md-table-editable="1"]';
+        let suppressTableEditClickUntil = 0;
+        let suppressTableContextMenuUntil = 0;
+
+        function cancelActiveTableEdit() {
+            const active = document.activeElement;
+            if (active && active.matches && active.matches(editableTableCellSelector)) {
+                active.blur();
+            }
+        }
+
+        function postTableContextMenu(context) {
+            if (!context) return false;
+            const now = Date.now();
+            suppressTableEditClickUntil = now + tableActionSuppressionMS;
+            suppressTableContextMenuUntil = now + tableContextMenuDeduplicationMS;
+            cancelActiveTableEdit();
             post({
                 kind: 'tableContextMenu',
-                tableIndex,
-                rowIndex,
-                columnIndex,
-                clientX: event.clientX,
-                clientY: event.clientY
+                tableIndex: context.tableIndex,
+                rowIndex: context.rowIndex,
+                columnIndex: context.columnIndex,
+                clientX: context.clientX,
+                clientY: context.clientY
             });
+            return true;
+        }
+
+        document.addEventListener('contextmenu', (event) => {
+            const context = tableContextFromPoint(event.target, event.clientX, event.clientY);
+            if (!context) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (Date.now() < suppressTableContextMenuUntil) return;
+            postTableContextMenu(context);
         }, true);
+
+        document.addEventListener('click', (event) => {
+            if (Date.now() < suppressTableEditClickUntil) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            const cell = event.target && event.target.closest
+                ? event.target.closest(editableTableCellSelector)
+                : null;
+            if (!cell) return;
+            activateEditableCell(cell);
+        }, true);
+
+        let tableLongPress = null;
+        document.addEventListener('touchstart', (event) => {
+            if (event.touches.length !== 1) return;
+            const touch = event.touches[0];
+            const context = tableContextFromPoint(event.target, touch.clientX, touch.clientY);
+            if (!context) return;
+            tableLongPress = {
+                x: touch.clientX,
+                y: touch.clientY,
+                timer: setTimeout(() => {
+                    tableLongPress = null;
+                    postTableContextMenu(context);
+                }, 550)
+            };
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchmove', (event) => {
+            if (!tableLongPress || event.touches.length !== 1) return;
+            const touch = event.touches[0];
+            if (Math.hypot(touch.clientX - tableLongPress.x, touch.clientY - tableLongPress.y) > 10) {
+                clearTimeout(tableLongPress.timer);
+                tableLongPress = null;
+            }
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchend', () => {
+            if (!tableLongPress) return;
+            clearTimeout(tableLongPress.timer);
+            tableLongPress = null;
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchcancel', () => {
+            if (!tableLongPress) return;
+            clearTimeout(tableLongPress.timer);
+            tableLongPress = null;
+        }, { passive: true, capture: true });
 
         window.MdPreviewTables = {
             perform(command, tableIndex, rowIndex, columnIndex) {
