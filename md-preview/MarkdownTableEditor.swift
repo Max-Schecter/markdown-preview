@@ -294,3 +294,169 @@ enum MarkdownTableEditor {
         return backslashCount % 2 == 1
     }
 }
+
+enum MarkdownTaskListEditor {
+    static func togglingTask(in markdown: String, taskIndex: Int, checked: Bool) -> String? {
+        guard taskIndex >= 0 else { return nil }
+
+        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
+        var lineStarts: [String.Index] = []
+        var cursor = markdown.startIndex
+
+        for line in lines {
+            lineStarts.append(cursor)
+            cursor = markdown.index(cursor, offsetBy: line.count)
+            if cursor < markdown.endIndex, markdown[cursor] == "\n" {
+                cursor = markdown.index(after: cursor)
+            }
+        }
+
+        var fence: Fence?
+        var currentTaskIndex = 0
+        for (lineIndex, rawLine) in lines.enumerated() {
+            let line = String(rawLine)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if isIndentedCode(line) {
+                continue
+            }
+            if let activeFence = fence {
+                if closesFence(trimmed, activeFence) {
+                    fence = nil
+                }
+                continue
+            } else if let openingFence = fenceStart(in: trimmed) {
+                fence = openingFence
+                continue
+            }
+
+            guard let marker = taskMarkerRange(in: line) else { continue }
+            if currentTaskIndex == taskIndex {
+                let start = markdown.index(lineStarts[lineIndex], offsetBy: marker.lowerBound)
+                let end = markdown.index(lineStarts[lineIndex], offsetBy: marker.upperBound)
+                var result = markdown
+                result.replaceSubrange(start..<end, with: checked ? "x" : " ")
+                return result
+            }
+            currentTaskIndex += 1
+        }
+
+        return nil
+    }
+
+    private struct Fence {
+        let marker: Character
+        let length: Int
+    }
+
+    private static func taskMarkerRange(in line: String) -> Range<Int>? {
+        let characters = Array(line)
+        var index = 0
+        while index < characters.count, characters[index] == " " {
+            index += 1
+        }
+        guard index < 4 else { return nil }
+
+        while index < characters.count, characters[index] == ">" {
+            index += 1
+            if index < characters.count, characters[index] == " " {
+                index += 1
+            }
+        }
+
+        guard index < characters.count else { return nil }
+        if characters[index] == "-" || characters[index] == "+" || characters[index] == "*" {
+            index += 1
+        } else {
+            let numberStart = index
+            while index < characters.count, characters[index].isNumber {
+                index += 1
+            }
+            guard index > numberStart,
+                  index < characters.count,
+                  characters[index] == "." || characters[index] == ")"
+            else { return nil }
+            index += 1
+        }
+
+        guard index < characters.count,
+              characters[index] == " " || characters[index] == "\t"
+        else { return nil }
+        index += 1
+
+        guard index + 2 < characters.count,
+              characters[index] == "[",
+              characters[index + 2] == "]",
+              characters[index + 1] == " " || characters[index + 1].lowercased() == "x"
+        else { return nil }
+
+        return (index + 1)..<(index + 2)
+    }
+
+    private static func fenceStart(in trimmed: String) -> Fence? {
+        guard let first = trimmed.first, first == "`" || first == "~" else { return nil }
+        let count = trimmed.prefix { $0 == first }.count
+        return count >= 3 ? Fence(marker: first, length: count) : nil
+    }
+
+    private static func closesFence(_ trimmed: String, _ fence: Fence) -> Bool {
+        guard trimmed.first == fence.marker else { return false }
+        let count = trimmed.prefix { $0 == fence.marker }.count
+        guard count >= fence.length else { return false }
+        return trimmed.dropFirst(count).allSatisfy { $0 == " " || $0 == "\t" }
+    }
+
+    private static func isIndentedCode(_ line: String) -> Bool {
+        guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        var count = 0
+        for ch in line {
+            if ch == " " {
+                count += 1
+                if count >= 4 { return true }
+            } else if ch == "\t" {
+                return true
+            } else {
+                return false
+            }
+        }
+        return false
+    }
+}
+
+struct RenderedEditHistory: Equatable {
+    struct Edit: Equatable {
+        let before: String
+        let after: String
+        let actionName: String
+    }
+
+    private(set) var undoStack: [Edit] = []
+    private(set) var redoStack: [Edit] = []
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+    var nextUndoActionName: String? { undoStack.last?.actionName }
+    var nextRedoActionName: String? { redoStack.last?.actionName }
+
+    mutating func record(before: String?, after: String, actionName: String) {
+        guard let before, before != after else { return }
+        undoStack.append(Edit(before: before, after: after, actionName: actionName))
+        redoStack.removeAll()
+    }
+
+    mutating func undo() -> Edit? {
+        guard let edit = undoStack.popLast() else { return nil }
+        redoStack.append(edit)
+        return edit
+    }
+
+    mutating func redo() -> Edit? {
+        guard let edit = redoStack.popLast() else { return nil }
+        undoStack.append(edit)
+        return edit
+    }
+
+    mutating func clear() {
+        undoStack.removeAll()
+        redoStack.removeAll()
+    }
+}

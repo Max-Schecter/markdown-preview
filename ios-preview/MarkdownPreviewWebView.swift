@@ -53,11 +53,16 @@ final class MarkdownWebViewModel: ObservableObject {
 struct MarkdownPreviewWebView: UIViewRepresentable {
     let markdown: String
     let assetBaseURL: URL
-    let onMarkdownChange: (String) -> Void
+    let onMarkdownChange: (String, String) -> Void
+    let onUndoCommand: () -> Void
+    let onRedoCommand: () -> Void
     @ObservedObject var model: MarkdownWebViewModel
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(model: model, onMarkdownChange: onMarkdownChange)
+        Coordinator(model: model,
+                    onMarkdownChange: onMarkdownChange,
+                    onUndoCommand: onUndoCommand,
+                    onRedoCommand: onRedoCommand)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -89,7 +94,9 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
 
         let assetScheme = MarkdownAssetScheme()
         private weak var model: MarkdownWebViewModel?
-        private let onMarkdownChange: (String) -> Void
+        private let onMarkdownChange: (String, String) -> Void
+        private let onUndoCommand: () -> Void
+        private let onRedoCommand: () -> Void
         weak var webView: WKWebView?
 
         private var currentMarkdown: String?
@@ -106,9 +113,14 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             let clientY: CGFloat
         }
 
-        init(model: MarkdownWebViewModel, onMarkdownChange: @escaping (String) -> Void) {
+        init(model: MarkdownWebViewModel,
+             onMarkdownChange: @escaping (String, String) -> Void,
+             onUndoCommand: @escaping () -> Void,
+             onRedoCommand: @escaping () -> Void) {
             self.model = model
             self.onMarkdownChange = onMarkdownChange
+            self.onUndoCommand = onUndoCommand
+            self.onRedoCommand = onRedoCommand
             super.init()
         }
 
@@ -145,6 +157,12 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                 handleTableEditMessage(dict)
             case "tableContextMenu":
                 handleTableContextMenuMessage(dict)
+            case "taskToggle":
+                handleTaskToggleMessage(dict)
+            case "undoCommand":
+                onUndoCommand()
+            case "redoCommand":
+                onRedoCommand()
             default:
                 break
             }
@@ -180,7 +198,27 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             else { return }
 
             currentMarkdown = updated
-            onMarkdownChange(updated)
+            onMarkdownChange(updated, actionName(from: dict, fallback: "Edit Table"))
+        }
+
+        private func handleTaskToggleMessage(_ dict: [String: Any]) {
+            guard let taskIndex = (dict["taskIndex"] as? NSNumber)?.intValue,
+                  let checked = dict["checked"] as? Bool ?? (dict["checked"] as? NSNumber)?.boolValue,
+                  let markdown = currentMarkdown,
+                  let updated = MarkdownTaskListEditor.togglingTask(in: markdown,
+                                                                    taskIndex: taskIndex,
+                                                                    checked: checked),
+                  updated != markdown
+            else { return }
+
+            currentMarkdown = updated
+            onMarkdownChange(updated, actionName(from: dict, fallback: checked ? "Check Task" : "Uncheck Task"))
+        }
+
+        private func actionName(from dict: [String: Any], fallback: String) -> String {
+            guard let value = dict["actionName"] as? String else { return fallback }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? fallback : trimmed
         }
 
         private func handleTableContextMenuMessage(_ dict: [String: Any]) {

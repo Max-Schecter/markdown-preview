@@ -10,7 +10,7 @@ final class MainSplitViewController: NSSplitViewController {
     private static let didSeedKey = "MainSplitView.didSeedInitialState"
 
     var onSelectFile: ((URL) -> Void)?
-    var onRenderedTableMarkdownChange: ((String) -> Void)?
+    var onRenderedMarkdownChange: ((String, String) -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -49,7 +49,7 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.activeHeadingDidChange = { [weak self] headingID in
             self?.sidebarViewController?.setActiveHeading(headingID)
         }
-        contentViewController?.markdownDidChangeFromRenderedTable = { [weak self] markdown in
+        contentViewController?.markdownDidChangeFromRenderedContent = { [weak self] markdown, actionName in
             self?.sidebarViewController?.display(
                 markdown: markdown,
                 fileName: self?.currentFileName ?? "",
@@ -58,7 +58,7 @@ final class MainSplitViewController: NSSplitViewController {
             self?.inspectorViewController?.display(
                 metadata: DocumentMetadata.make(url: self?.currentFileURL, markdown: markdown)
             )
-            self?.onRenderedTableMarkdownChange?(markdown)
+            self?.onRenderedMarkdownChange?(markdown, actionName)
         }
     }
 
