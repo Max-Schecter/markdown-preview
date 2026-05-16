@@ -23,6 +23,33 @@
 		9AF00000000000000000000B /* Highlight-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000109 /* Highlight-LICENSE.txt */; };
 		9AF00000000000000000000C /* purify.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF00000000000000000010A /* purify.min.js */; };
 		9AF00000000000000000000D /* DOMPurify-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9AF00000000000000000010B /* DOMPurify-LICENSE.txt */; };
+		9B1000000000000000000001 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 9B1000000000000000000040 /* Markdown */; };
+		9B1000000000000000000002 /* MarkdownPreviewIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000020 /* MarkdownPreviewIOSApp.swift */; };
+		9B1000000000000000000003 /* DocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000021 /* DocumentStore.swift */; };
+		9B1000000000000000000004 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000022 /* RootView.swift */; };
+		9B1000000000000000000005 /* MarkdownDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000023 /* MarkdownDocumentView.swift */; };
+		9B1000000000000000000006 /* MarkdownPreviewWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000024 /* MarkdownPreviewWebView.swift */; };
+		9B1000000000000000000007 /* OutlineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000025 /* OutlineListView.swift */; };
+		9B1000000000000000000008 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000026 /* WelcomeView.swift */; };
+		9B1000000000000000000009 /* MarkdownHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000028 /* MarkdownHTML.swift */; };
+		9B100000000000000000000A /* MarkdownFrontmatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000029 /* MarkdownFrontmatter.swift */; };
+		9B100000000000000000000B /* MarkdownTOC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B100000000000000000002A /* MarkdownTOC.swift */; };
+		9B100000000000000000000C /* MarkdownTableEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B100000000000000000002B /* MarkdownTableEditor.swift */; };
+		9B100000000000000000000D /* EscapingHTMLFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B100000000000000000002C /* EscapingHTMLFormatter.swift */; };
+		9B100000000000000000000E /* MarkdownAssetSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B100000000000000000002D /* MarkdownAssetSchemeHandler.swift */; };
+		9B100000000000000000000F /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B100000000000000000002E /* InspectorView.swift */; };
+		9B1000000000000000000010 /* mermaid.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000101 /* mermaid.min.js */; };
+		9B1000000000000000000011 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000102 /* LICENSE */; };
+		9B1000000000000000000012 /* katex.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000103 /* katex.min.js */; };
+		9B1000000000000000000013 /* katex.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000104 /* katex.min.css */; };
+		9B1000000000000000000014 /* copy-tex.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000105 /* copy-tex.min.js */; };
+		9B1000000000000000000015 /* KaTeX-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000106 /* KaTeX-LICENSE.txt */; };
+		9B1000000000000000000016 /* highlight.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000107 /* highlight.min.js */; };
+		9B1000000000000000000017 /* highlight.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000108 /* highlight.min.css */; };
+		9B1000000000000000000018 /* Highlight-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9AF000000000000000000109 /* Highlight-LICENSE.txt */; };
+		9B1000000000000000000019 /* purify.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9AF00000000000000000010A /* purify.min.js */; };
+		9B100000000000000000001A /* DOMPurify-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9AF00000000000000000010B /* DOMPurify-LICENSE.txt */; };
+		9B1000000000000000000041 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B1000000000000000000042 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +92,23 @@
 		9AF000000000000000000109 /* Highlight-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Highlight-LICENSE.txt"; path = "md-preview/Vendor/Highlight/Highlight-LICENSE.txt"; sourceTree = "<group>"; };
 		9AF00000000000000000010A /* purify.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = purify.min.js; path = "md-preview/Vendor/DOMPurify/purify.min.js"; sourceTree = "<group>"; };
 		9AF00000000000000000010B /* DOMPurify-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "DOMPurify-LICENSE.txt"; path = "md-preview/Vendor/DOMPurify/DOMPurify-LICENSE.txt"; sourceTree = "<group>"; };
+		9B100000000000000000001B /* Markdown Preview iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Markdown Preview iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B1000000000000000000020 /* MarkdownPreviewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewIOSApp.swift; sourceTree = "<group>"; };
+		9B1000000000000000000021 /* DocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStore.swift; sourceTree = "<group>"; };
+		9B1000000000000000000022 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		9B1000000000000000000023 /* MarkdownDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocumentView.swift; sourceTree = "<group>"; };
+		9B1000000000000000000024 /* MarkdownPreviewWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewWebView.swift; sourceTree = "<group>"; };
+		9B1000000000000000000025 /* OutlineListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineListView.swift; sourceTree = "<group>"; };
+		9B1000000000000000000026 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		9B1000000000000000000027 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9B1000000000000000000028 /* MarkdownHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownHTML.swift; path = "md-preview/MarkdownHTML.swift"; sourceTree = "<group>"; };
+		9B1000000000000000000029 /* MarkdownFrontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownFrontmatter.swift; path = "md-preview/MarkdownFrontmatter.swift"; sourceTree = "<group>"; };
+		9B100000000000000000002A /* MarkdownTOC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownTOC.swift; path = "md-preview/MarkdownTOC.swift"; sourceTree = "<group>"; };
+		9B100000000000000000002B /* MarkdownTableEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownTableEditor.swift; path = "md-preview/MarkdownTableEditor.swift"; sourceTree = "<group>"; };
+		9B100000000000000000002C /* EscapingHTMLFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EscapingHTMLFormatter.swift; path = "md-preview/EscapingHTMLFormatter.swift"; sourceTree = "<group>"; };
+		9B100000000000000000002D /* MarkdownAssetSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownAssetSchemeHandler.swift; path = "md-preview/MarkdownAssetSchemeHandler.swift"; sourceTree = "<group>"; };
+		9B100000000000000000002E /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectorView.swift; path = "md-preview/InspectorView.swift"; sourceTree = "<group>"; };
+		9B1000000000000000000042 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -127,6 +171,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9B1000000000000000000033 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B1000000000000000000001 /* Markdown in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -147,6 +199,8 @@
 				9AF00000000000000000010B /* DOMPurify-LICENSE.txt */,
 				9A0207C32FA0ED7C00092060 /* md-preview */,
 				9A0209312FA10D4C00092060 /* quick-look */,
+				9B100000000000000000002F /* ios-preview */,
+				9B1000000000000000000030 /* Shared iOS Sources */,
 				9A02092E2FA10D4C00092060 /* Frameworks */,
 				9A0207C22FA0ED7C00092060 /* Products */,
 			);
@@ -157,6 +211,7 @@
 			children = (
 				9A0207C12FA0ED7C00092060 /* Markdown Preview.app */,
 				9A02092D2FA10D4C00092060 /* quick-look.appex */,
+				9B100000000000000000001B /* Markdown Preview iOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -167,6 +222,36 @@
 				9A02092F2FA10D4C00092060 /* Quartz.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		9B100000000000000000002F /* ios-preview */ = {
+			isa = PBXGroup;
+			children = (
+				9B1000000000000000000020 /* MarkdownPreviewIOSApp.swift */,
+				9B1000000000000000000021 /* DocumentStore.swift */,
+				9B1000000000000000000022 /* RootView.swift */,
+				9B1000000000000000000023 /* MarkdownDocumentView.swift */,
+				9B1000000000000000000024 /* MarkdownPreviewWebView.swift */,
+				9B1000000000000000000025 /* OutlineListView.swift */,
+				9B1000000000000000000026 /* WelcomeView.swift */,
+				9B1000000000000000000027 /* Info.plist */,
+				9B1000000000000000000042 /* Assets.xcassets */,
+			);
+			path = "ios-preview";
+			sourceTree = "<group>";
+		};
+		9B1000000000000000000030 /* Shared iOS Sources */ = {
+			isa = PBXGroup;
+			children = (
+				9B1000000000000000000028 /* MarkdownHTML.swift */,
+				9B1000000000000000000029 /* MarkdownFrontmatter.swift */,
+				9B100000000000000000002A /* MarkdownTOC.swift */,
+				9B100000000000000000002B /* MarkdownTableEditor.swift */,
+				9B100000000000000000002C /* EscapingHTMLFormatter.swift */,
+				9B100000000000000000002D /* MarkdownAssetSchemeHandler.swift */,
+				9B100000000000000000002E /* InspectorView.swift */,
+			);
+			name = "Shared iOS Sources";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -221,6 +306,26 @@
 			productReference = 9A02092D2FA10D4C00092060 /* quick-look.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		9B1000000000000000000031 /* Markdown Preview iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B100000000000000000003F /* Build configuration list for PBXNativeTarget "Markdown Preview iOS" */;
+			buildPhases = (
+				9B1000000000000000000032 /* Sources */,
+				9B1000000000000000000033 /* Frameworks */,
+				9B1000000000000000000034 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Markdown Preview iOS";
+			packageProductDependencies = (
+				9B1000000000000000000040 /* Markdown */,
+			);
+			productName = "Markdown Preview iOS";
+			productReference = 9B100000000000000000001B /* Markdown Preview iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -235,6 +340,9 @@
 						CreatedOnToolsVersion = 26.4.1;
 					};
 					9A02092C2FA10D4C00092060 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					9B1000000000000000000031 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
@@ -259,6 +367,7 @@
 			targets = (
 				9A0207C02FA0ED7C00092060 /* md-preview */,
 				9A02092C2FA10D4C00092060 /* quick-look */,
+				9B1000000000000000000031 /* Markdown Preview iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -289,6 +398,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9B1000000000000000000034 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B1000000000000000000010 /* mermaid.min.js in Resources */,
+				9B1000000000000000000011 /* LICENSE in Resources */,
+				9B1000000000000000000012 /* katex.min.js in Resources */,
+				9B1000000000000000000013 /* katex.min.css in Resources */,
+				9B1000000000000000000014 /* copy-tex.min.js in Resources */,
+				9B1000000000000000000015 /* KaTeX-LICENSE.txt in Resources */,
+				9B1000000000000000000016 /* highlight.min.js in Resources */,
+				9B1000000000000000000017 /* highlight.min.css in Resources */,
+				9B1000000000000000000018 /* Highlight-LICENSE.txt in Resources */,
+				9B1000000000000000000019 /* purify.min.js in Resources */,
+				9B100000000000000000001A /* DOMPurify-LICENSE.txt in Resources */,
+				9B1000000000000000000041 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -303,6 +431,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B1000000000000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B1000000000000000000002 /* MarkdownPreviewIOSApp.swift in Sources */,
+				9B1000000000000000000003 /* DocumentStore.swift in Sources */,
+				9B1000000000000000000004 /* RootView.swift in Sources */,
+				9B1000000000000000000005 /* MarkdownDocumentView.swift in Sources */,
+				9B1000000000000000000006 /* MarkdownPreviewWebView.swift in Sources */,
+				9B1000000000000000000007 /* OutlineListView.swift in Sources */,
+				9B1000000000000000000008 /* WelcomeView.swift in Sources */,
+				9B1000000000000000000009 /* MarkdownHTML.swift in Sources */,
+				9B100000000000000000000A /* MarkdownFrontmatter.swift in Sources */,
+				9B100000000000000000000B /* MarkdownTOC.swift in Sources */,
+				9B100000000000000000000C /* MarkdownTableEditor.swift in Sources */,
+				9B100000000000000000000D /* EscapingHTMLFormatter.swift in Sources */,
+				9B100000000000000000000E /* MarkdownAssetSchemeHandler.swift in Sources */,
+				9B100000000000000000000F /* InspectorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -448,7 +597,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 5P3TSMNV42;
+				DEVELOPMENT_TEAM = NP8R944CHB;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -485,7 +634,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 5P3TSMNV42;
+				DEVELOPMENT_TEAM = NP8R944CHB;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -571,6 +720,76 @@
 			};
 			name = Release;
 		};
+		9B100000000000000000003D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9A0209A02FA1100100092060 /* Version.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = NP8R944CHB;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ios-preview/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Markdown Preview";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "doc.md-preview.ios";
+				PRODUCT_NAME = "Markdown Preview iOS";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9B100000000000000000003E /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9A0209A02FA1100100092060 /* Version.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = NP8R944CHB;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ios-preview/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Markdown Preview";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "doc.md-preview.ios";
+				PRODUCT_NAME = "Markdown Preview iOS";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -597,6 +816,15 @@
 			buildConfigurations = (
 				9A02093E2FA10D4C00092060 /* Debug */,
 				9A02093F2FA10D4C00092060 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9B100000000000000000003F /* Build configuration list for PBXNativeTarget "Markdown Preview iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B100000000000000000003D /* Debug */,
+				9B100000000000000000003E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -634,6 +862,11 @@
 			productName = Markdown;
 		};
 		9A33940B2FA5AF500015D9A4 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A3394082FA5AF500015D9A4 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+		9B1000000000000000000040 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9A3394082FA5AF500015D9A4 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
