@@ -31,7 +31,9 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     let webView: WKWebView
     var heightDidChange: ((CGFloat) -> Void)?
     var fragmentLinkActivated: ((String) -> Void)?
-    var markdownDidChangeFromRenderedTable: ((String) -> Void)?
+    var markdownDidChangeFromRenderedContent: ((String, String) -> Void)?
+    var undoRequested: (() -> Void)?
+    var redoRequested: (() -> Void)?
     private let assetScheme = MarkdownAssetScheme()
     private var currentAssetBase: URL?
     private let messageBridge = HostBridge()
@@ -269,6 +271,12 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
             handleTableEditMessage(dict)
         case "tableContextMenu":
             handleTableContextMenuMessage(dict)
+        case "taskToggle":
+            handleTaskToggleMessage(dict)
+        case "undoCommand":
+            undoRequested?()
+        case "redoCommand":
+            redoRequested?()
         default:
             break
         }
@@ -302,7 +310,27 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         else { return }
 
         currentMarkdown = updated
-        markdownDidChangeFromRenderedTable?(updated)
+        markdownDidChangeFromRenderedContent?(updated, actionName(from: dict, fallback: "Edit Table"))
+    }
+
+    private func handleTaskToggleMessage(_ dict: [String: Any]) {
+        guard let taskIndex = (dict["taskIndex"] as? NSNumber)?.intValue,
+              let checked = dict["checked"] as? Bool ?? (dict["checked"] as? NSNumber)?.boolValue,
+              let markdown = currentMarkdown,
+              let updated = MarkdownTaskListEditor.togglingTask(in: markdown,
+                                                                taskIndex: taskIndex,
+                                                                checked: checked),
+              updated != markdown
+        else { return }
+
+        currentMarkdown = updated
+        markdownDidChangeFromRenderedContent?(updated, actionName(from: dict, fallback: checked ? "Check Task" : "Uncheck Task"))
+    }
+
+    private func actionName(from dict: [String: Any], fallback: String) -> String {
+        guard let value = dict["actionName"] as? String else { return fallback }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private func handleTableContextMenuMessage(_ dict: [String: Any]) {
@@ -947,8 +975,24 @@ private final class NonScrollingWKWebView: WKWebView {
     }
 
     override func doCommand(by selector: Selector) {
+        if selector == NSSelectorFromString("undo:") {
+            (superview as? MarkdownWebView)?.undoRequested?()
+            return
+        }
+        if selector == NSSelectorFromString("redo:") {
+            (superview as? MarkdownWebView)?.redoRequested?()
+            return
+        }
         if performStandardScrollCommand(selector) { return }
         super.doCommand(by: selector)
+    }
+
+    @IBAction func undo(_ sender: Any?) {
+        (superview as? MarkdownWebView)?.undoRequested?()
+    }
+
+    @IBAction func redo(_ sender: Any?) {
+        (superview as? MarkdownWebView)?.redoRequested?()
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

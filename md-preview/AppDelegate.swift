@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import os
 import Sparkle
 import UniformTypeIdentifiers
 
@@ -36,6 +37,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     private var currentFileURL: URL?
     private var currentMarkdown: String?
     private var fileWatcher: FileWatcher?
+    private var renderedEditHistory = RenderedEditHistory()
+    private let renderedEditWriteQueue = DispatchQueue(label: "doc.md-preview.rendered-edit-writes", qos: .userInitiated)
+    private var renderedEditWritesInFlight = 0
+    private var pendingWatchedFileReload = false
+    private var renderedEditGeneration: UInt64 = 0
     private var isInspectorToggleSelected = false
     private weak var openWithItem: NSMenuToolbarItem?
     private weak var inspectorItem: NSToolbarItem?
@@ -53,6 +59,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     private var searchMode: SearchMode = .contains
     private var pendingFindWork: DispatchWorkItem?
     private static let findDebounceDelay: TimeInterval = 0.10
+    private let undoLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "doc.md-preview",
+                                 category: "rendered-edit-undo")
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
@@ -69,8 +77,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         split.onSelectFile = { [weak self] url in
             self?.present(url: url)
         }
-        split.onRenderedTableMarkdownChange = { [weak self] markdown in
-            self?.saveRenderedTableEdit(markdown)
+        split.onRenderedMarkdownChange = { [weak self] markdown, actionName in
+            self?.applyRenderedMarkdownEdit(markdown, actionName: actionName, refreshPreview: false)
         }
         window.contentViewController = split
         window.setContentSize(NSSize(width: 1100, height: 720))
@@ -88,7 +96,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         installSidebarViewMenuItems()
         installGoMenu()
         installZoomMenuItemIcons()
-
         hasLaunched = true
 
         if let url = pendingLaunchURL {
@@ -111,6 +118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         let isFileSwitch = currentFileURL != nil && currentFileURL != url
         currentFileURL = url
         currentMarkdown = nil
+        clearRenderedEditHistory()
         window.title = url.lastPathComponent
         if isFileSwitch {
             (window.contentViewController as? MainSplitViewController)?.clearContent()
@@ -128,7 +136,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         fileWatcher?.cancel()
         let watcher = FileWatcher(url: url) { [weak self] in
             guard let self, self.currentFileURL == url else { return }
-            self.loadFile(at: url, silentOnFailure: true)
+            self.handleWatchedFileChange(at: url)
         }
         watcher.onRename = { [weak self] newURL in
             self?.handleRename(to: newURL)
@@ -1205,10 +1213,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
     }
 
     private func loadFile(at url: URL, silentOnFailure: Bool = false) {
+        let generation = renderedEditGeneration
         Task { @concurrent [weak self] in
             do {
                 let text = try String(contentsOf: url, encoding: .utf8)
-                await self?.applyLoadedMarkdown(text, fileURL: url)
+                await self?.applyLoadedMarkdown(text, fileURL: url, requestedAtGeneration: generation)
             } catch {
                 // Wrap as NSError (Sendable) so the original presentation —
                 // localizedDescription + recovery suggestion — survives the
@@ -1220,26 +1229,165 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         }
     }
 
-    private func applyLoadedMarkdown(_ text: String, fileURL: URL) {
+    private func applyLoadedMarkdown(_ text: String, fileURL: URL, requestedAtGeneration: UInt64) {
+        guard requestedAtGeneration == renderedEditGeneration else { return }
         guard text != currentMarkdown else { return }
         currentMarkdown = text
+        clearRenderedEditHistory()
         renderCurrentDocument(text: text, fileURL: fileURL)
     }
 
-    private func saveRenderedTableEdit(_ markdown: String) {
+    private func handleWatchedFileChange(at url: URL) {
+        if renderedEditWritesInFlight > 0 {
+            pendingWatchedFileReload = true
+            return
+        }
+        loadFile(at: url, silentOnFailure: true)
+    }
+
+    private func applyRenderedMarkdownEdit(_ markdown: String,
+                                           actionName: String,
+                                           refreshPreview: Bool = true) {
+        guard let url = currentFileURL else { return }
+        guard markdown != currentMarkdown else { return }
+        let historyBeforeEdit = renderedEditHistory
+        let previousMarkdown = currentMarkdown
+        currentMarkdown = markdown
+        renderedEditGeneration &+= 1
+        let generation = renderedEditGeneration
+        renderedEditHistory.record(before: previousMarkdown, after: markdown, actionName: actionName)
+        undoLog.debug("record \(actionName, privacy: .public); undo=\(self.renderedEditHistory.undoStack.count, privacy: .public) redo=\(self.renderedEditHistory.redoStack.count, privacy: .public)")
+        if refreshPreview,
+           let split = window.contentViewController as? MainSplitViewController {
+            split.display(markdown: markdown,
+                          fileName: url.lastPathComponent,
+                          url: url,
+                          assetBaseURL: url.deletingLastPathComponent())
+        }
+        persistRenderedMarkdown(markdown,
+                                to: url,
+                                generation: generation,
+                                historyOnFailure: historyBeforeEdit,
+                                markdownOnFailure: previousMarkdown)
+    }
+
+    @IBAction func undoRenderedEdit(_ sender: Any?) {
+        let historyBeforeUndo = renderedEditHistory
+        guard let edit = renderedEditHistory.undo() else {
+            undoLog.debug("undo ignored; stack empty")
+            return
+        }
+        undoLog.debug("undo \(edit.actionName, privacy: .public); undo=\(self.renderedEditHistory.undoStack.count, privacy: .public) redo=\(self.renderedEditHistory.redoStack.count, privacy: .public)")
+        applyRenderedMarkdownHistoryState(edit.before,
+                                          historyOnFailure: historyBeforeUndo,
+                                          markdownOnFailure: edit.after)
+    }
+
+    @IBAction func redoRenderedEdit(_ sender: Any?) {
+        let historyBeforeRedo = renderedEditHistory
+        guard let edit = renderedEditHistory.redo() else {
+            undoLog.debug("redo ignored; stack empty")
+            return
+        }
+        undoLog.debug("redo \(edit.actionName, privacy: .public); undo=\(self.renderedEditHistory.undoStack.count, privacy: .public) redo=\(self.renderedEditHistory.redoStack.count, privacy: .public)")
+        applyRenderedMarkdownHistoryState(edit.after,
+                                          historyOnFailure: historyBeforeRedo,
+                                          markdownOnFailure: edit.before)
+    }
+
+    private func applyRenderedMarkdownHistoryState(_ markdown: String,
+                                                   historyOnFailure: RenderedEditHistory,
+                                                   markdownOnFailure: String) {
         guard let url = currentFileURL else { return }
         currentMarkdown = markdown
-        Task { @concurrent [weak self] in
+        renderedEditGeneration &+= 1
+        let generation = renderedEditGeneration
+        if let split = window.contentViewController as? MainSplitViewController {
+            split.display(markdown: markdown,
+                          fileName: url.lastPathComponent,
+                          url: url,
+                          assetBaseURL: url.deletingLastPathComponent())
+        }
+        persistRenderedMarkdown(markdown,
+                                to: url,
+                                generation: generation,
+                                historyOnFailure: historyOnFailure,
+                                markdownOnFailure: markdownOnFailure)
+    }
+
+    private func clearRenderedEditHistory() {
+        renderedEditHistory.clear()
+        undoLog.debug("history cleared")
+    }
+
+    private func persistRenderedMarkdown(_ markdown: String,
+                                         to url: URL,
+                                         generation: UInt64,
+                                         historyOnFailure: RenderedEditHistory,
+                                         markdownOnFailure: String?) {
+        renderedEditWritesInFlight += 1
+        renderedEditWriteQueue.async { [weak self] in
             do {
                 try markdown.write(to: url, atomically: true, encoding: .utf8)
+                Task { @MainActor [weak self] in
+                    self?.renderedEditWriteDidFinish(for: url)
+                }
             } catch {
                 let nsError = error as NSError
-                await self?.applyRenderedTableSaveFailure(nsError)
+                Task { @MainActor [weak self] in
+                    self?.renderedEditWriteDidFinish(for: url)
+                    self?.applyRenderedTableSaveFailure(nsError,
+                                                        generation: generation,
+                                                        historyOnFailure: historyOnFailure,
+                                                        markdownOnFailure: markdownOnFailure)
+                }
             }
         }
     }
 
-    private func applyRenderedTableSaveFailure(_ error: NSError) {
+    private func renderedEditWriteDidFinish(for url: URL) {
+        renderedEditWritesInFlight = max(0, renderedEditWritesInFlight - 1)
+        guard renderedEditWritesInFlight == 0,
+              pendingWatchedFileReload,
+              currentFileURL == url else { return }
+        pendingWatchedFileReload = false
+        let generation = renderedEditGeneration
+        Task { @concurrent [weak self] in
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            await self?.applyWatchedMarkdownIfStillCurrent(text,
+                                                           fileURL: url,
+                                                           requestedAtGeneration: generation)
+        }
+    }
+
+    private func applyWatchedMarkdownIfStillCurrent(_ text: String,
+                                                    fileURL: URL,
+                                                    requestedAtGeneration: UInt64) {
+        guard currentFileURL == fileURL,
+              renderedEditWritesInFlight == 0,
+              requestedAtGeneration == renderedEditGeneration,
+              text != currentMarkdown else { return }
+        applyLoadedMarkdown(text, fileURL: fileURL, requestedAtGeneration: requestedAtGeneration)
+    }
+
+    private func applyRenderedTableSaveFailure(_ error: NSError,
+                                               generation: UInt64,
+                                               historyOnFailure: RenderedEditHistory,
+                                               markdownOnFailure: String?) {
+        if renderedEditGeneration == generation {
+            renderedEditHistory = historyOnFailure
+            if let markdownOnFailure,
+               let url = currentFileURL {
+                currentMarkdown = markdownOnFailure
+                renderedEditGeneration &+= 1
+                if let split = window.contentViewController as? MainSplitViewController {
+                    split.display(markdown: markdownOnFailure,
+                                  fileName: url.lastPathComponent,
+                                  url: url,
+                                  assetBaseURL: url.deletingLastPathComponent())
+                }
+            }
+        }
         NSAlert(error: error).beginSheetModal(for: window)
     }
 

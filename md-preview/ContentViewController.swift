@@ -21,7 +21,7 @@ final class ContentViewController: NSViewController {
     private var headingOffsetsCSS: [CGFloat] = []
     private var lastActiveHeadingID: Int?
     private var pendingHeadingOffsetsRefresh: DispatchWorkItem?
-    var markdownDidChangeFromRenderedTable: ((String) -> Void)?
+    var markdownDidChangeFromRenderedContent: ((String, String) -> Void)?
 
     // Sidebar-click pin. Bounds events are ignored until `holdUntil`
     // (covers our own animation), then we measure scroll distance from
@@ -67,8 +67,14 @@ final class ContentViewController: NSViewController {
         webView.fragmentLinkActivated = { [weak self] fragment in
             self?.scrollToElement(id: fragment)
         }
-        webView.markdownDidChangeFromRenderedTable = { [weak self] markdown in
-            self?.markdownDidChangeFromRenderedTable?(markdown)
+        webView.markdownDidChangeFromRenderedContent = { [weak self] markdown, actionName in
+            self?.markdownDidChangeFromRenderedContent?(markdown, actionName)
+        }
+        webView.undoRequested = {
+            (NSApp.delegate as? AppDelegate)?.undoRenderedEdit(nil)
+        }
+        webView.redoRequested = {
+            (NSApp.delegate as? AppDelegate)?.redoRenderedEdit(nil)
         }
         webView.enablePersistentZoom(defaultsKey: Self.pageZoomDefaultsKey)
 

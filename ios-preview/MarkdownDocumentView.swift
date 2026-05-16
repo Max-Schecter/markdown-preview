@@ -19,6 +19,8 @@ struct MarkdownDocumentView: View {
             markdown: document.markdown,
             assetBaseURL: document.assetBaseURL,
             onMarkdownChange: saveMarkdown,
+            onUndoCommand: undoMarkdown,
+            onRedoCommand: redoMarkdown,
             model: webViewModel
         )
         .documentTopChromeTransition()
@@ -39,9 +41,26 @@ struct MarkdownDocumentView: View {
         }
     }
 
-    private func saveMarkdown(_ markdown: String) {
+    private func saveMarkdown(_ markdown: String, actionName: String) {
         do {
-            try documentStore.save(markdown: markdown)
+            try documentStore.save(markdown: markdown,
+                                   actionName: actionName)
+        } catch {
+            webViewModel.report(error.localizedDescription)
+        }
+    }
+
+    private func undoMarkdown() {
+        do {
+            try documentStore.undoRenderedEdit()
+        } catch {
+            webViewModel.report(error.localizedDescription)
+        }
+    }
+
+    private func redoMarkdown() {
+        do {
+            try documentStore.redoRenderedEdit()
         } catch {
             webViewModel.report(error.localizedDescription)
         }

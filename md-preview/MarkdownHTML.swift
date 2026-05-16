@@ -786,20 +786,22 @@ nonisolated enum MarkdownHTML {
             return tableCells(table).map((row) => row.map((cell) => cell.dataset.mdDirty === '1'));
         }
 
-        function postTableEdit(table, force) {
+        function postTableEdit(table, force, actionName) {
             const tableIndex = Number.parseInt(table.dataset.mdTableIndex || '-1', 10);
             if (!Number.isInteger(tableIndex) || tableIndex < 0) return;
             if (!force && table.dataset.mdTableDirty !== '1') return;
             const rows = serializeTable(table);
             const dirtyRows = serializeDirtyRows(table);
+            const action = actionName || table.dataset.mdTableActionName || 'Edit Table Cell';
             table.dataset.mdTableDirty = '0';
+            delete table.dataset.mdTableActionName;
             tableCells(table).forEach((row) => {
                 row.forEach((cell) => {
                     cell.dataset.mdOriginalText = cell.textContent || '';
                     cell.dataset.mdDirty = '0';
                 });
             });
-            post({ kind: 'tableEdit', tableIndex, rows, dirtyRows });
+            post({ kind: 'tableEdit', tableIndex, rows, dirtyRows, actionName: action });
             pushHeight();
         }
 
@@ -835,16 +837,18 @@ nonisolated enum MarkdownHTML {
                 table.dataset.mdTableDirty = '1';
                 cell.dataset.mdDirty = '1';
                 clearTimeout(timer);
-                timer = setTimeout(() => postTableEdit(table, false), 120);
+                table.dataset.mdTableActionName = 'Edit Table Cell';
+                timer = setTimeout(() => postTableEdit(table, false, 'Edit Table Cell'), 120);
             });
             cell.addEventListener('blur', () => {
                 clearTimeout(timer);
                 if ((cell.textContent || '') !== (cell.dataset.mdOriginalText || '')) {
                     table.dataset.mdTableDirty = '1';
                     cell.dataset.mdDirty = '1';
+                    table.dataset.mdTableActionName = 'Edit Table Cell';
                 }
                 cell.removeAttribute('contenteditable');
-                postTableEdit(table, false);
+                postTableEdit(table, false, 'Edit Table Cell');
             });
         }
 
@@ -864,6 +868,29 @@ nonisolated enum MarkdownHTML {
                 rows.forEach((row, rowIndex) => {
                     row.forEach((cell, columnIndex) => {
                         makeEditableCell(cell, table, rowIndex, columnIndex);
+                    });
+                });
+            });
+        }
+
+        function decorateTaskListItems() {
+            document.querySelectorAll('input.task-list-item-checkbox').forEach((checkbox, index) => {
+                checkbox.dataset.mdTaskIndex = String(index);
+                checkbox.disabled = false;
+                checkbox.removeAttribute('disabled');
+                checkbox.setAttribute('aria-label', checkbox.checked ? 'Mark task incomplete' : 'Mark task complete');
+                if (checkbox.dataset.mdTaskEditReady === '1') return;
+                checkbox.dataset.mdTaskEditReady = '1';
+                checkbox.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const taskIndex = Number.parseInt(checkbox.dataset.mdTaskIndex || '-1', 10);
+                    if (!Number.isInteger(taskIndex) || taskIndex < 0) return;
+                    checkbox.setAttribute('aria-label', checkbox.checked ? 'Mark task incomplete' : 'Mark task complete');
+                    post({
+                        kind: 'taskToggle',
+                        taskIndex,
+                        checked: checkbox.checked,
+                        actionName: checkbox.checked ? 'Check Task' : 'Uncheck Task'
                     });
                 });
             });
@@ -991,6 +1018,14 @@ nonisolated enum MarkdownHTML {
                 const columnCount = Math.max(1, ...rows.map((row) => row.length));
                 if (!Number.isInteger(columnIndex) || columnIndex < 0 || columnIndex >= columnCount) return false;
                 const headerCell = rows[0] && rows[0][0] && rows[0][0].tagName === 'TH';
+                const actionNames = {
+                    insertRowAbove: 'Insert Table Row',
+                    insertRowBelow: 'Insert Table Row',
+                    deleteRow: 'Delete Table Row',
+                    insertColumnBefore: 'Insert Table Column',
+                    insertColumnAfter: 'Insert Table Column',
+                    deleteColumn: 'Delete Table Column'
+                };
 
                 function newCell(forHeader) {
                     const cell = document.createElement(forHeader ? 'th' : 'td');
@@ -1043,7 +1078,8 @@ nonisolated enum MarkdownHTML {
                 }
 
                 decorateTables();
-                postTableEdit(table, true);
+                decorateTaskListItems();
+                postTableEdit(table, true, actionNames[command] || 'Edit Table');
                 return true;
             }
         };
@@ -1082,6 +1118,14 @@ nonisolated enum MarkdownHTML {
             event.stopPropagation();
             copyCodeBlock(button);
         });
+
+        document.addEventListener('keydown', (event) => {
+            const key = (event.key || '').toLowerCase();
+            if (key !== 'z' || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+            event.preventDefault();
+            event.stopPropagation();
+            post({ kind: event.shiftKey ? 'redoCommand' : 'undoCommand' });
+        }, true);
 
         // Vendor lazy-load helpers. rAF is paused while the WKWebView is
         // offscreen (e.g. during the launch-time warmup before the window
@@ -1203,6 +1247,7 @@ nonisolated enum MarkdownHTML {
             if (articleHTML) {
                 decorateCodeBlocks();
                 decorateTables();
+                decorateTaskListItems();
                 for (const fn of reappliers) {
                     try { fn(); } catch (e) { /* one bad apple shouldn't block others */ }
                 }
@@ -1229,6 +1274,7 @@ nonisolated enum MarkdownHTML {
             populateFromTemplate();
             decorateCodeBlocks();
             decorateTables();
+            decorateTaskListItems();
             pushHeight();
             try {
                 const ro = new ResizeObserver(pushHeight);
