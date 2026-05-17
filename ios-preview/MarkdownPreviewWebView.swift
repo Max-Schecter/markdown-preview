@@ -70,7 +70,9 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
         config.setURLSchemeHandler(context.coordinator.assetScheme, forURLScheme: MarkdownAssetScheme.scheme)
         config.userContentController.add(context.coordinator, name: Coordinator.messageName)
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = UndoForwardingWKWebView(frame: .zero, configuration: config)
+        webView.undoRequested = context.coordinator.undoFromResponderAction
+        webView.redoRequested = context.coordinator.redoFromResponderAction
         webView.navigationDelegate = context.coordinator
         webView.scrollView.backgroundColor = .systemBackground
         webView.isOpaque = false
@@ -169,6 +171,14 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             default:
                 break
             }
+        }
+
+        func undoFromResponderAction() {
+            onUndoCommand()
+        }
+
+        func redoFromResponderAction() {
+            onRedoCommand()
         }
 
         private func handleTableEditMessage(_ dict: [String: Any]) {
@@ -355,6 +365,29 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                   json.count >= 2 else { return "\"\"" }
             return String(json.dropFirst().dropLast())
         }
+    }
+}
+
+private final class UndoForwardingWKWebView: WKWebView {
+    var undoRequested: (() -> Void)?
+    var redoRequested: (() -> Void)?
+
+    override var canBecomeFirstResponder: Bool { true }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(UndoForwardingWKWebView.undo(_:)) ||
+            action == #selector(UndoForwardingWKWebView.redo(_:)) {
+            return true
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    @objc func undo(_ sender: Any?) {
+        undoRequested?()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        redoRequested?()
     }
 }
 
