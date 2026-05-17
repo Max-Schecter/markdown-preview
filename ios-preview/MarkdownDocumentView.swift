@@ -41,12 +41,14 @@ struct MarkdownDocumentView: View {
         }
     }
 
-    private func saveMarkdown(_ markdown: String, actionName: String) {
+    private func saveMarkdown(_ markdown: String, actionName: String) -> Bool {
         do {
             try documentStore.save(markdown: markdown,
                                    actionName: actionName)
+            return true
         } catch {
             webViewModel.report(error.localizedDescription)
+            return false
         }
     }
 
