@@ -53,7 +53,7 @@ final class MarkdownWebViewModel: ObservableObject {
 struct MarkdownPreviewWebView: UIViewRepresentable {
     let markdown: String
     let assetBaseURL: URL
-    let onMarkdownChange: (String, String) -> Void
+    let onMarkdownChange: (String, String) -> Bool
     let onUndoCommand: () -> Void
     let onRedoCommand: () -> Void
     @ObservedObject var model: MarkdownWebViewModel
@@ -94,7 +94,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
 
         let assetScheme = MarkdownAssetScheme()
         private weak var model: MarkdownWebViewModel?
-        private let onMarkdownChange: (String, String) -> Void
+        private let onMarkdownChange: (String, String) -> Bool
         private let onUndoCommand: () -> Void
         private let onRedoCommand: () -> Void
         weak var webView: WKWebView?
@@ -114,7 +114,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
         }
 
         init(model: MarkdownWebViewModel,
-             onMarkdownChange: @escaping (String, String) -> Void,
+             onMarkdownChange: @escaping (String, String) -> Bool,
              onUndoCommand: @escaping () -> Void,
              onRedoCommand: @escaping () -> Void) {
             self.model = model
@@ -124,8 +124,10 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             super.init()
         }
 
-        func display(markdown: String, assetBaseURL: URL) {
-            guard markdown != currentMarkdown || assetBaseURL != currentAssetBaseURL else { return }
+        func display(markdown: String, assetBaseURL: URL, force: Bool = false) {
+            if !force {
+                guard markdown != currentMarkdown || assetBaseURL != currentAssetBaseURL else { return }
+            }
             currentMarkdown = markdown
             currentAssetBaseURL = assetBaseURL
             assetScheme.setBaseURL(assetBaseURL)
@@ -137,7 +139,8 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                     markdown: markdown,
                     allowsScroll: true,
                     assetBaseHref: "\(MarkdownAssetScheme.scheme):///",
-                    vendorLoading: .lazy
+                    vendorLoading: .lazy,
+                    emitsUndoRedoShortcuts: true
                 )
                 await MainActor.run {
                     guard generation == self.renderGeneration else { return }
@@ -197,8 +200,9 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                   updated != markdown
             else { return }
 
-            currentMarkdown = updated
-            onMarkdownChange(updated, actionName(from: dict, fallback: "Edit Table"))
+            commitRenderedMarkdown(updated,
+                                   previous: markdown,
+                                   actionName: actionName(from: dict, fallback: "Edit Table"))
         }
 
         private func handleTaskToggleMessage(_ dict: [String: Any]) {
@@ -211,8 +215,21 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                   updated != markdown
             else { return }
 
-            currentMarkdown = updated
-            onMarkdownChange(updated, actionName(from: dict, fallback: checked ? "Check Task" : "Uncheck Task"))
+            commitRenderedMarkdown(updated,
+                                   previous: markdown,
+                                   actionName: actionName(from: dict, fallback: checked ? "Check Task" : "Uncheck Task"))
+        }
+
+        private func commitRenderedMarkdown(_ updated: String,
+                                            previous: String,
+                                            actionName: String) {
+            if onMarkdownChange(updated, actionName) {
+                currentMarkdown = updated
+            } else if let currentAssetBaseURL {
+                display(markdown: previous,
+                        assetBaseURL: currentAssetBaseURL,
+                        force: true)
+            }
         }
 
         private func actionName(from dict: [String: Any], fallback: String) -> String {

@@ -33,18 +33,21 @@ nonisolated enum MarkdownHTML {
     static func makeHTML(from markdown: String,
                          allowsScroll: Bool = false,
                          assetBaseHref: String? = nil,
-                         vendorLoading: VendorLoading = .inline) -> String {
+                         vendorLoading: VendorLoading = .inline,
+                         emitsUndoRedoShortcuts: Bool = false) -> String {
         render(markdown: markdown,
                allowsScroll: allowsScroll,
                assetBaseHref: assetBaseHref,
-               vendorLoading: vendorLoading).html
+               vendorLoading: vendorLoading,
+               emitsUndoRedoShortcuts: emitsUndoRedoShortcuts).html
     }
 
     static func render(markdown: String,
                        allowsScroll: Bool = false,
                        assetBaseHref: String? = nil,
                        vendorLoading: VendorLoading = .inline,
-                       warmup: Bool = false) -> RenderedHTML {
+                       warmup: Bool = false,
+                       emitsUndoRedoShortcuts: Bool = false) -> RenderedHTML {
         let body = MarkdownFrontmatter.split(markdown).body
         let footnotes = extractFootnotes(from: body)
         let math = extractMath(from: footnotes.markdown)
@@ -68,6 +71,9 @@ nonisolated enum MarkdownHTML {
         let mathBlock = containsMath ? katexHead(mode: vendorLoading) : ""
         let mermaidBlock = containsMermaid ? mermaidScript(mode: vendorLoading) : ""
         let highlightBlock = containsCode ? highlightHead(mode: vendorLoading) : ""
+        let shortcutConfig = """
+        <script>window.__mdPreviewEmitUndoRedoShortcuts = \(emitsUndoRedoShortcuts ? "true" : "false");</script>
+        """
         // Warmup keeps the article in layout (so Mermaid's IntersectionObserver
         // still fires and the renderer actually executes) but invisible —
         // otherwise the synthetic diagram flashes on screen before the first
@@ -93,6 +99,7 @@ nonisolated enum MarkdownHTML {
         <style>\(stylesheet)</style>
         \(scrollOverride)
         \(sanitizerBlock)
+        \(shortcutConfig)
         \(hostBridgeScript)
         \(mathBlock)
         \(mermaidBlock)
@@ -1120,8 +1127,12 @@ nonisolated enum MarkdownHTML {
         });
 
         document.addEventListener('keydown', (event) => {
+            if (!window.__mdPreviewEmitUndoRedoShortcuts) return;
             const key = (event.key || '').toLowerCase();
             if (key !== 'z' || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+            const target = event.target;
+            if (target && (target.isContentEditable
+                    || (target.closest && target.closest('[contenteditable], input, textarea, select')))) return;
             event.preventDefault();
             event.stopPropagation();
             post({ kind: event.shiftKey ? 'redoCommand' : 'undoCommand' });
