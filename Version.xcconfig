@@ -3,3 +3,5 @@
 
 MARKETING_VERSION = 0.0.22
 CURRENT_PROJECT_VERSION = 26
+
+#include? "Developer.local.xcconfig"

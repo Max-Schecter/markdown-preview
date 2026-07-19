@@ -8,6 +8,7 @@ import SwiftUI
 struct MarkdownDocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var documentStore: DocumentStore
+    @AppStorage(MarkdownHTML.PreviewAppearance.defaultsKey) private var previewAppearanceRawValue = MarkdownHTML.PreviewAppearance.system.rawValue
 
     let document: MarkdownDocument
     @ObservedObject var webViewModel: MarkdownWebViewModel
@@ -21,6 +22,7 @@ struct MarkdownDocumentView: View {
             onMarkdownChange: saveMarkdown,
             onUndoCommand: undoMarkdown,
             onRedoCommand: redoMarkdown,
+            previewAppearance: previewAppearance,
             model: webViewModel
         )
         .documentTopChromeTransition()
@@ -68,8 +70,24 @@ struct MarkdownDocumentView: View {
         }
     }
 
+    private var previewAppearance: MarkdownHTML.PreviewAppearance {
+        MarkdownHTML.PreviewAppearance(rawValue: previewAppearanceRawValue) ?? .system
+    }
+
+    private var previewAppearancePicker: some View {
+        Picker("Preview Appearance", selection: $previewAppearanceRawValue) {
+            ForEach(MarkdownHTML.PreviewAppearance.allCases, id: \.rawValue) { appearance in
+                Text(appearance.displayName).tag(appearance.rawValue)
+            }
+        }
+    }
+
     private var compactActions: some View {
         Menu {
+            previewAppearancePicker
+
+            Divider()
+
             ShareLink(item: document.url) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
@@ -89,6 +107,14 @@ struct MarkdownDocumentView: View {
 
     private var regularActions: some View {
         HStack(spacing: 18) {
+            Menu {
+                previewAppearancePicker
+            } label: {
+                Label("Preview Appearance", systemImage: "circle.lefthalf.filled")
+            }
+            .accessibilityLabel("Preview Appearance")
+            .accessibilityIdentifier("preview-appearance")
+
             ShareLink(item: document.url) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }

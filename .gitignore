@@ -2,6 +2,13 @@
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
+## Local signing
+Developer.local.xcconfig
+*.mobileprovision
+*.cer
+*.p12
+*.p8
+
 ## User settings
 xcuserdata/
 *.xcuserstate

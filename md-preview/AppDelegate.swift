@@ -94,6 +94,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
 
         installFindBar()
         installSidebarViewMenuItems()
+        installPreviewAppearanceMenu()
         installGoMenu()
         installZoomMenuItemIcons()
         hasLaunched = true
@@ -530,6 +531,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSToolbarDelegate, NSSharing
         filesMenuItem = files
 
         viewMenu.insertItem(.separator(), at: insertIndex + 3)
+    }
+
+    private func installPreviewAppearanceMenu() {
+        guard let viewMenu = NSApp.mainMenu?.items
+            .first(where: { $0.title == "View" })?.submenu else { return }
+
+        let submenu = NSMenu()
+        for appearance in MarkdownHTML.PreviewAppearance.allCases {
+            let item = NSMenuItem(title: appearance.displayName,
+                                  action: #selector(MainSplitViewController.setPreviewAppearanceFromMenu(_:)),
+                                  keyEquivalent: "")
+            item.representedObject = appearance.rawValue
+            item.target = nil
+            submenu.addItem(item)
+        }
+
+        let item = NSMenuItem(title: "Preview Appearance", action: nil, keyEquivalent: "")
+        item.submenu = submenu
+
+        let insertIndex = viewMenu.items.firstIndex(where: { $0.title == "Actual Size" })
+            ?? viewMenu.items.count
+        viewMenu.insertItem(.separator(), at: insertIndex)
+        viewMenu.insertItem(item, at: insertIndex + 1)
     }
 
     private func makeSidebarViewMenuItem(title: String,

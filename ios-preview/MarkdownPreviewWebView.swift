@@ -56,6 +56,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
     let onMarkdownChange: (String, String) -> Bool
     let onUndoCommand: () -> Void
     let onRedoCommand: () -> Void
+    let previewAppearance: MarkdownHTML.PreviewAppearance
     @ObservedObject var model: MarkdownWebViewModel
 
     func makeCoordinator() -> Coordinator {
@@ -88,7 +89,9 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.display(markdown: markdown, assetBaseURL: assetBaseURL)
+        context.coordinator.display(markdown: markdown,
+                                    assetBaseURL: assetBaseURL,
+                                    previewAppearance: previewAppearance)
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
@@ -103,6 +106,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
 
         private var currentMarkdown: String?
         private var currentAssetBaseURL: URL?
+        private var currentPreviewAppearance: MarkdownHTML.PreviewAppearance = .system
         private var tableMenuContext: TableMenuContext?
         fileprivate weak var tableEditMenuInteraction: UIEditMenuInteraction?
         private var renderGeneration: UInt64 = 0
@@ -126,12 +130,19 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             super.init()
         }
 
-        func display(markdown: String, assetBaseURL: URL, force: Bool = false) {
+        func display(markdown: String,
+                     assetBaseURL: URL,
+                     previewAppearance: MarkdownHTML.PreviewAppearance = .system,
+                     force: Bool = false) {
             if !force {
-                guard markdown != currentMarkdown || assetBaseURL != currentAssetBaseURL else { return }
+                guard markdown != currentMarkdown ||
+                    assetBaseURL != currentAssetBaseURL ||
+                    previewAppearance != currentPreviewAppearance
+                else { return }
             }
             currentMarkdown = markdown
             currentAssetBaseURL = assetBaseURL
+            currentPreviewAppearance = previewAppearance
             assetScheme.setBaseURL(assetBaseURL)
             renderGeneration &+= 1
             let generation = renderGeneration
@@ -142,6 +153,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
                     allowsScroll: true,
                     assetBaseHref: "\(MarkdownAssetScheme.scheme):///",
                     vendorLoading: .lazy,
+                    previewAppearance: previewAppearance,
                     emitsUndoRedoShortcuts: true
                 )
                 await MainActor.run {
@@ -238,6 +250,7 @@ struct MarkdownPreviewWebView: UIViewRepresentable {
             } else if let currentAssetBaseURL {
                 display(markdown: previous,
                         assetBaseURL: currentAssetBaseURL,
+                        previewAppearance: currentPreviewAppearance,
                         force: true)
             }
         }

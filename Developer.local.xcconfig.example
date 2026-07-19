@@ -1,0 +1,5 @@
+// Copy this file to Developer.local.xcconfig and set your own Apple team ID.
+// Developer.local.xcconfig is ignored by Git.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+CODE_SIGN_STYLE = Automatic

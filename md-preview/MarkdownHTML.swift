@@ -10,6 +10,41 @@ import Markdown
 // the main actor. This lets MarkdownWebView.display dispatch the render
 // to a concurrent task instead of stalling the main thread on large docs.
 nonisolated enum MarkdownHTML {
+    enum PreviewAppearance: String, CaseIterable, Sendable {
+        case system
+        case light
+        case dark
+
+        static let defaultsKey = "MarkdownPreview.previewAppearance"
+
+        var displayName: String {
+            switch self {
+            case .system: "System"
+            case .light: "Light"
+            case .dark: "Dark"
+            }
+        }
+
+        var htmlClass: String {
+            switch self {
+            case .system: "md-theme-system"
+            case .light: "md-theme-light"
+            case .dark: "md-theme-dark"
+            }
+        }
+
+        static func stored(in defaults: UserDefaults = .standard) -> Self {
+            guard let rawValue = defaults.string(forKey: defaultsKey),
+                  let appearance = Self(rawValue: rawValue)
+            else { return .system }
+            return appearance
+        }
+
+        func store(in defaults: UserDefaults = .standard) {
+            defaults.set(rawValue, forKey: Self.defaultsKey)
+        }
+    }
+
     /// How the heavy KaTeX/Mermaid bundles are delivered.
     /// - inline: bundles are embedded as `<script>…</script>` blocks in the
     ///   HTML head. Self-contained, slow first-paint, used by Quick Look
@@ -34,11 +69,13 @@ nonisolated enum MarkdownHTML {
                          allowsScroll: Bool = false,
                          assetBaseHref: String? = nil,
                          vendorLoading: VendorLoading = .inline,
+                         previewAppearance: PreviewAppearance = .system,
                          emitsUndoRedoShortcuts: Bool = false) -> String {
         render(markdown: markdown,
                allowsScroll: allowsScroll,
                assetBaseHref: assetBaseHref,
                vendorLoading: vendorLoading,
+               previewAppearance: previewAppearance,
                emitsUndoRedoShortcuts: emitsUndoRedoShortcuts).html
     }
 
@@ -47,6 +84,7 @@ nonisolated enum MarkdownHTML {
                        assetBaseHref: String? = nil,
                        vendorLoading: VendorLoading = .inline,
                        warmup: Bool = false,
+                       previewAppearance: PreviewAppearance = .system,
                        emitsUndoRedoShortcuts: Bool = false) -> RenderedHTML {
         let body = MarkdownFrontmatter.split(markdown).body
         let footnotes = extractFootnotes(from: body)
@@ -91,7 +129,7 @@ nonisolated enum MarkdownHTML {
         let safeBody = bodyHTML.replacingOccurrences(of: "</template", with: "<\\/template")
         let html = """
         <!DOCTYPE html>
-        <html>
+        <html class="\(previewAppearance.htmlClass)">
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1922,8 +1960,21 @@ nonisolated enum MarkdownHTML {
         --code-bg: #f5f5f7;
         --grid: #d2d2d7;
     }
+    :root.md-theme-light {
+        color-scheme: light;
+    }
+    :root.md-theme-dark {
+        color-scheme: dark;
+        --text: #f5f5f7;
+        --secondary: #86868b;
+        --link: #2997ff;
+        --aside-bg: #323232;
+        --aside-border: #9a9a9e;
+        --code-bg: #2A2828;
+        --grid: #424245;
+    }
     @media (prefers-color-scheme: dark) {
-        :root {
+        :root.md-theme-system {
             --text: #f5f5f7;
             --secondary: #86868b;
             --link: #2997ff;
@@ -1979,6 +2030,7 @@ nonisolated enum MarkdownHTML {
         margin: 0;
         padding: 0;
         overflow: hidden;
+        background: Canvas;
     }
     ::-webkit-scrollbar {
         display: none;
@@ -1990,7 +2042,7 @@ nonisolated enum MarkdownHTML {
         font-size: 15px;
         line-height: 1.52;
         color: var(--text);
-        background: transparent;
+        background: Canvas;
         padding: 32px 40px 48px;
         -webkit-font-smoothing: antialiased;
     }

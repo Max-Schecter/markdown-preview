@@ -74,6 +74,7 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     private var lastReportedDocumentHeight: CGFloat = 1
     private var zoomDefaultsKey: String?
     private var currentMarkdown: String?
+    private var currentPreviewAppearance: MarkdownHTML.PreviewAppearance = .system
 
     override init(frame frameRect: NSRect) {
         let config = WKWebViewConfiguration()
@@ -84,7 +85,6 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         super.init(frame: frameRect)
 
         messageBridge.owner = self
-        webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(webView)
@@ -176,20 +176,41 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         webView.evaluateJavaScript("window.MdPreview && MdPreview.update('');") { _, _ in }
     }
 
-    func display(markdown: String, assetBaseURL: URL? = nil) {
+    func display(markdown: String,
+                 assetBaseURL: URL? = nil,
+                 previewAppearance: MarkdownHTML.PreviewAppearance = .system) {
         tableMenuContext = nil
         lastRightMouseDownEvent = nil
+        let appearanceChanged = previewAppearance != currentPreviewAppearance
+        currentPreviewAppearance = previewAppearance
+        applyWebViewAppearance(previewAppearance)
         currentMarkdown = markdown
         assetScheme.setBaseURL(assetBaseURL)
         currentAssetBase = assetBaseURL
+        if appearanceChanged {
+            loadedFingerprint = nil
+            isPageReady = false
+        }
         let baseHref = "\(MarkdownAssetScheme.scheme):///"
         renderGeneration &+= 1
         let generation = renderGeneration
         Task { @concurrent [weak self] in
             let rendered = Self.timedRender(label: "display",
                                             markdown: markdown,
-                                            assetBaseHref: baseHref)
+                                            assetBaseHref: baseHref,
+                                            previewAppearance: .system)
             await self?.applyDisplay(rendered, generation: generation)
+        }
+    }
+
+    private func applyWebViewAppearance(_ appearance: MarkdownHTML.PreviewAppearance) {
+        switch appearance {
+        case .system:
+            webView.appearance = nil
+        case .light:
+            webView.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            webView.appearance = NSAppearance(named: .darkAqua)
         }
     }
 
@@ -199,12 +220,14 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     private nonisolated static func timedRender(label: String,
                                                 markdown: String,
                                                 assetBaseHref: String,
-                                                warmup: Bool = false) -> MarkdownHTML.RenderedHTML {
+                                                warmup: Bool = false,
+                                                previewAppearance: MarkdownHTML.PreviewAppearance = .system) -> MarkdownHTML.RenderedHTML {
         let t0 = DispatchTime.now()
         let rendered = MarkdownHTML.render(markdown: markdown,
                                            assetBaseHref: assetBaseHref,
                                            vendorLoading: .lazy,
-                                           warmup: warmup)
+                                           warmup: warmup,
+                                           previewAppearance: previewAppearance)
         let elapsedMs = Int(
             (Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds)
              / 1_000_000).rounded()

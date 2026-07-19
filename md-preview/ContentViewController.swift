@@ -21,6 +21,9 @@ final class ContentViewController: NSViewController {
     private var headingOffsetsCSS: [CGFloat] = []
     private var lastActiveHeadingID: Int?
     private var pendingHeadingOffsetsRefresh: DispatchWorkItem?
+    private var currentMarkdown: String?
+    private var currentAssetBaseURL: URL?
+    private var previewAppearance = MarkdownHTML.PreviewAppearance.stored()
     var markdownDidChangeFromRenderedContent: ((String, String) -> Void)?
 
     // Sidebar-click pin. Bounds events are ignored until `holdUntil`
@@ -124,14 +127,32 @@ final class ContentViewController: NSViewController {
     }
 
     func display(markdown: String, assetBaseURL: URL? = nil) {
+        currentMarkdown = markdown
+        currentAssetBaseURL = assetBaseURL
         resetScrollspy()
-        webView.display(markdown: markdown, assetBaseURL: assetBaseURL)
+        webView.display(markdown: markdown,
+                        assetBaseURL: assetBaseURL,
+                        previewAppearance: previewAppearance)
         scheduleHeadingOffsetsRefresh()
     }
 
     func clearContent() {
+        currentMarkdown = nil
+        currentAssetBaseURL = nil
         resetScrollspy()
         webView.clearContent()
+    }
+
+    func setPreviewAppearance(_ appearance: MarkdownHTML.PreviewAppearance) {
+        guard appearance != previewAppearance else { return }
+        previewAppearance = appearance
+        appearance.store()
+        guard let currentMarkdown else { return }
+        display(markdown: currentMarkdown, assetBaseURL: currentAssetBaseURL)
+    }
+
+    var currentPreviewAppearance: MarkdownHTML.PreviewAppearance {
+        previewAppearance
     }
 
     /// Drops scrollspy state before a doc swap so the previous doc's

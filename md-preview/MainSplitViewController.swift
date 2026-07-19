@@ -113,9 +113,22 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.resetZoom()
     }
 
+    @IBAction func setPreviewAppearanceFromMenu(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem,
+              let rawValue = item.representedObject as? String,
+              let appearance = MarkdownHTML.PreviewAppearance(rawValue: rawValue)
+        else { return }
+        contentViewController?.setPreviewAppearance(appearance)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(resetDocumentZoom(_:)) {
             return abs((contentViewController?.pageZoom ?? 1.0) - 1.0) > 0.001
+        }
+        if menuItem.action == #selector(setPreviewAppearanceFromMenu(_:)),
+           let rawValue = menuItem.representedObject as? String,
+           let appearance = MarkdownHTML.PreviewAppearance(rawValue: rawValue) {
+            menuItem.state = appearance == contentViewController?.currentPreviewAppearance ? .on : .off
         }
         return true
     }

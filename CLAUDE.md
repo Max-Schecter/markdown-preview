@@ -77,7 +77,7 @@ Default is **unpublish** (reversible — flips `published=false` on Amore so it 
 ## Amore configuration (already wired)
 
 - **Hosting**: Amore-managed with custom domain `storage.md-preview.app`
-- **Codesign identity**: `Developer ID Application: Mohamed Fauzaan (5P3TSMNV42)`
+- **Codesign identity**: configured locally for release signing
 - **Notary keychain profile**: `md-preview-notary`
 - **EdDSA public key** (in Info.plist `SUPublicEDKey`): `gIQjgqfjkIR+egQ4S1oBLxE/NCDxpXXGdZXSpn04VAY=` — private key in login Keychain
 
