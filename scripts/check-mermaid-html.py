@@ -3,13 +3,29 @@
 from pathlib import Path
 import sys
 
-source = Path("md-preview/MarkdownHTML.swift").read_text()
+source = "\n".join(p.read_text() for p in Path("md-preview/Rendering").glob("MarkdownHTML*.swift"))
 checks = {
     "detects mermaid code fences": "language-mermaid" in source and "mermaidRegex" in source,
     "loads bundled Mermaid renderer": "Vendor/Mermaid" in source and "mermaid.min" in source,
     "does not load Mermaid from a CDN": "cdn.jsdelivr.net/npm/mermaid" not in source,
     "initializes Mermaid after page load": "mermaid.initialize" in source and "mermaid.run" in source,
     "styles Mermaid containers": ".mermaid" in source,
+    "centers rendered diagrams": (
+        "justify-content: center" in source
+        and "svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')" in source
+        and "s.surface.style.transform" in source
+    ),
+    "toggles full-width diagrams": (
+        'data-mm-act="width"' in source
+        and "classList.toggle('mermaid-width-expanded')" in source
+        and ".mermaid-figure.mermaid-width-expanded" in source
+    ),
+    "opens diagram popup with section context": (
+        'data-mm-act="popup"' in source
+        and "kind: 'mermaidPopup'" in source
+        and "sectionTitle" in source
+        and "openPopup" in source
+    ),
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
