@@ -1,7 +1,9 @@
 // Centralized version configuration for all targets.
 // Bump these values to release a new version.
 
-MARKETING_VERSION = 0.0.22
-CURRENT_PROJECT_VERSION = 26
+#include? "Secrets.xcconfig"
+
+MARKETING_VERSION = 0.0.64
+CURRENT_PROJECT_VERSION = 68
 
 #include? "Developer.local.xcconfig"

@@ -42,6 +42,7 @@ playground.xcworkspace
 .swiftpm/
 *.swiftpm/
 Package.resolved
+Secrets.xcconfig
 
 .build/
 
@@ -77,3 +78,15 @@ fastlane/test_output
 
 # macOS
 .DS_Store
+
+# Editor bundle build (scripts/editor-bundle)
+node_modules/
+
+# Private/local material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+*.log

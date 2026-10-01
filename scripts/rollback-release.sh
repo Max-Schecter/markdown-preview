@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# This source-only fork has no configured distribution infrastructure.
+echo "Distribution is unconfigured for this fork; see FORK.md." >&2
+exit 1
+
 #
 # Roll back a Markdown Preview release.
 #

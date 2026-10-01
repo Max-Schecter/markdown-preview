@@ -1,14 +1,28 @@
+> **Fork review candidate:** includes iOS/iPad support and custom rendered table editing. Distribution and service credentials are unconfigured. Read [FORK.md](FORK.md) before building or releasing. The documentation below describes upstream.
+
 <h1 align="center">Markdown Preview</h1>
 
 <p align="center">
-  <img src="docs/app-icon.png" width="128" alt="App icon" />
+  <img src="docs/markdown-logo.svg" width="128" alt="Markdown Preview logo" />
 </p>
 
 <p align="center">
   A fast, native macOS app for reading Markdown files.
 </p>
 
-<p align="center"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2015%2B-blue" />&nbsp;<img alt="Swift" src="https://img.shields.io/badge/swift-6.0-orange" />&nbsp;<img alt="License" src="https://img.shields.io/github/license/pluk-inc/md-preview.app" />&nbsp;<img alt="Latest release" src="https://img.shields.io/github/v/release/pluk-inc/md-preview.app" /></p>
+<p align="center"><img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2015%2B-blue" />&nbsp;<img alt="Swift" src="https://img.shields.io/badge/swift-6.0-orange" />&nbsp;<img alt="License" src="https://img.shields.io/badge/license-MIT-green" />&nbsp;<img alt="Latest release" src="https://img.shields.io/github/v/release/pluk-inc/markdown-preview" />&nbsp;<img alt="Homebrew cask" src="https://img.shields.io/homebrew/cask/v/markdown-preview" /></p>
+
+<p align="center">
+  <a href="https://discord.com/invite/NUtNMK7re2">
+    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?logo=discord&amp;logoColor=white" alt="Join our Discord community" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://buymeacoffee.com/pluk">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="42" alt="Buy Me a Coffee" />
+  </a>
+</p>
 
 ---
 
@@ -16,16 +30,26 @@
 
 ## Installation
 
+Markdown Preview is available in the official [Homebrew cask repository](https://formulae.brew.sh/cask/markdown-preview):
+
 ```sh
-brew install --cask pluk-inc/tap/markdown-preview
+brew install --cask markdown-preview
 ```
 
-Or grab the latest signed and notarized DMG from the [Releases](https://github.com/pluk-inc/md-preview.app/releases) page.
+Or grab the latest signed and notarized DMG from the [Releases](https://github.com/pluk-inc/markdown-preview/releases) page.
 
 ## Screenshots
 
 <p align="center">
   <img src="docs/screenshot-main.png" width="820" alt="Main window with document outline sidebar" />
+</p>
+
+<p align="center">
+  <em>Edit Markdown directly with a native formatting toolbar:</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-edit-mode.png" width="820" alt="Edit Mode with document outline and Markdown formatting toolbar" />
 </p>
 
 <p align="center">
@@ -46,22 +70,34 @@ Or grab the latest signed and notarized DMG from the [Releases](https://github.c
 
 ## Features
 
-- **Native rendering** — `WKWebView` pipeline backed by [swift-markdown](https://github.com/swiftlang/swift-markdown), with heading anchors and link handling.
+**App language:** Choose **Settings → General → Language** to use a bundled translation independently of your system language. Quit and reopen the app to apply the choice to settings, menus, and document controls. **System Default** removes the app override and follows macOS again. This preference persists across launches and affects only the app; Quick Look previews continue to use their system-selected language. Available languages are discovered from the app’s bundled translations.
+
+Single source newlines remain visible by default. Enable **Settings → General → Reading → Strict line breaks** to let ordinary source lines flow into paragraphs in reading view and Quick Look. Two trailing spaces or a backslash still create an explicit line break; blank lines still separate paragraphs. Reopen an existing Quick Look preview after changing this setting.
+
+- **Native rendering** — `WKWebView` pipeline backed by [swift-markdown](https://github.com/swiftlang/swift-markdown), with heading anchors and link handling. Bare `http://` and `https://` URLs are clickable in the app and Quick Look previews.
+- **Read Mode** — select and copy text, follow links, and browse tables. Click task checkboxes to save each change directly to the file. Tables and Quick Look previews remain read-only.
+- **Edit Mode** — edit Markdown in place with a formatting toolbar for headings, emphasis, lists, quotes, code, and links. Table cells show inline formatting until focused, then reveal their Markdown syntax for editing. Task markers become checkboxes once you finish typing the closing bracket; Enter continues a task list, and Enter on an empty task exits it. Toggle it from the toolbar or with <kbd>⌘E</kbd>, then save with <kbd>⌘S</kbd>.
 - **Mermaid diagrams** — fenced `mermaid` code blocks render as diagrams in both the app and Quick Look previews, using a bundled renderer so previews work offline without a CDN request.
 - **Math equations** — LaTeX inline (`$x_1 + x_2$`), display (`$$\int_0^1 x^2\,dx$$`), and fenced `math` blocks render with a bundled KaTeX. Selecting a rendered formula and copying yields the original LaTeX source (via the official `copy-tex` extension).
 - **Document outline** — sidebar TOC that mirrors your headings; click to jump.
+- **File navigator** — browse Markdown files in the sidebar. Click a folder's name, icon, or empty row space to expand or collapse it, or use its disclosure triangle. Click a file to open it in the current reading or editing mode.
 - **Inspector panel** — toggleable side panel with file metadata.
 - **In-document search** — toolbar search field plus standard <kbd>⌘F</kbd> / <kbd>⌘G</kbd> / <kbd>⌘⇧G</kbd> for next/previous match.
+- **Search for Document** — find a file by name, as against searching inside one. <kbd>⇧⌘O</kbd>, or a toolbar button you can drag in via *View → Customize Toolbar…*, opens a draggable floating palette over the current document, with native Liquid Glass on macOS 26 and later (Escape or clicking outside dismisses it); the palette remembers where you drag it relative to the document window and stays on that window’s current screen; the empty query shows up to 10 recently opened files across folders, newest first, including when no document is open. Typing keeps matching recents above project file results without duplicates; clearing the query restores recents. History persists across launches and follows *File → Open Recent → Clear Menu*. Results update in place when each search finishes, with the matched letters picked out in bold and a breadcrumb path beneath each filename. <kbd>↑</kbd> and <kbd>↓</kbd> move through the results (<kbd>Home</kbd>, <kbd>End</kbd>, <kbd>Page Up</kbd> and <kbd>Page Down</kbd> work too). <kbd>↩</kbd> opens the highlighted file in the current tab, <kbd>⌘↩</kbd> in a new tab, <kbd>⌥↩</kbd> in a new window. It searches the folder the sidebar has mounted and recognizes the same Markdown extensions as the navigator, but leaves out dependency and build folders (`node_modules`, `vendor`, `build`, `DerivedData`, `Pods`, `target`, and similar), the contents of packages such as `.app` or `.rtfd` bundles, and folders more than 12 levels deep. In very large projects it indexes the first 20,000 files and says so.
 - **Open With** — switch to your real editor (VS Code, Cursor, Zed, Sublime, BBEdit, Nova, CotEditor, TextMate, MacVim, Xcode, TextEdit) without leaving the preview. The list filters to apps that actually declare an editor role for Markdown, and remembers your pick.
-- **Text zoom** — bump preview text up or down with the toolbar's <kbd>A A</kbd> control or <kbd>⌘+</kbd> / <kbd>⌘−</kbd> / <kbd>⌘0</kbd>. Discrete Safari-style stops from 50% to 300%.
-- **Customizable toolbar** — drag in the items you actually use (Print, Copy, Zoom, Sidebar, Open With, Inspector, Share, Search) via *View → Customize Toolbar…* Standard AppKit affordance, your layout sticks across launches.
+- **Open in LLM** — send the current Markdown file to Codex, Claude, or ChatGPT from the toolbar. Supported apps open with file or folder context where possible, with a copy-and-open fallback for longer prompts.
+- **Text zoom** — bump text up or down in Read or Edit mode with the toolbar's <kbd>A A</kbd> control or <kbd>⌘+</kbd> / <kbd>⌘−</kbd> / <kbd>⌘0</kbd>, or pinch the trackpad in Read mode. Discrete Safari-style stops from 50% to 300%.
+- **Customizable toolbar** — drag in the items you actually use (Print, Copy, Zoom, Sidebar, Open With, Inspector, Share, Search, Search for Document) via *View → Customize Toolbar…* Standard AppKit affordance, your layout sticks across launches.
 - **Share = copy the source** — the share toolbar feeds the picker the Markdown text itself, so **Copy** writes the raw source to the clipboard (great for pasting into ChatGPT / Claude), and Mail, Messages, and Notes get the content in the body instead of a file URL.
 - **Quick Look extension** — system-wide `.md` previews from Finder spacebar, Spotlight, and Mail attachments without launching the app.
+- **Command line tools** — install `mdp`, `md-preview`, and `markdown-preview` from the app menu, then open files or folders from any shell with commands like `mdp README.md` or `mdp .`.
+- **URL scheme** — open a file or folder from a browser link or another app with `md-preview://file/<absolute path>` (e.g. `md-preview://file/Users/me/project/README.md`), the same shape as `cursor://file/…`. Percent-encode special characters in the path (a space becomes `%20`).
 - **Default handler** — offers to register itself as the default `.md` opener on first launch.
+- **Fast opening** — a document you open again shows its first screen at once from a saved image while the page loads (documents that look final on first paint, so not ones with images, math, Mermaid diagrams, or code highlighted after load); the app keeps the images for the 40 most recent documents in its own cache, and they never leave your Mac.
 
 ## Supported file types
 
-`.md`, `.markdown`, `.mdown`, `.txt`
+`.md`, `.markdown`, `.mdown`, `.mdx`, `.txt`
 UTI: `net.daringfireball.markdown`
 
 ## Requirements
@@ -77,7 +113,19 @@ cd markdown-preview
 open markdown-preview.xcodeproj
 ```
 
-Build and run the `markdown-preview` scheme. Swift Package Manager will resolve [Sparkle](https://github.com/sparkle-project/Sparkle) and [swift-markdown](https://github.com/swiftlang/swift-markdown) on first build.
+Build and run the `markdown-preview` scheme. Swift Package Manager will resolve [Sparkle](https://github.com/sparkle-project/Sparkle), [Sentry](https://github.com/getsentry/sentry-cocoa), and [swift-markdown](https://github.com/swiftlang/swift-markdown) on first build.
+
+### Crash reporting
+
+Release builds submit native crash reports to the `pluk-inc/markdown-preview` Sentry project. The integration does not collect performance traces, session data, breadcrumbs, network requests, user information, document contents, or file paths. Users can turn reporting off in Markdown Preview > Settings > Privacy; on later launches, the Sentry SDK will not initialize at all.
+
+The committed DSN is a public client key. Release archives upload the app dSYM with `sentry-cli`; authenticate locally with `sentry-cli login` and keep that authentication token outside the repository.
+
+### Anonymous usage analytics
+
+Release builds can submit at most one anonymous `app became active` event per installation per UTC day when Markdown Preview becomes active. The event contains a random installation identifier, app version, macOS major version, processor architecture, locale country or region, and the flag that prevents PostHog from creating a person profile. It is used to count daily and monthly active installations and understand basic platform compatibility. It does not contain document contents, file names or paths, actions, screens, precise location, personal information, or advertising identifiers. Users can disable it from Settings > Privacy.
+
+The PostHog project token is injected from the gitignored `Secrets.xcconfig`. Copy `Secrets.xcconfig.example` to `Secrets.xcconfig` and set `POSTHOG_PROJECT_TOKEN` before making a release build. If the token is absent, or for a Debug build, analytics remains disabled. Every event disables GeoIP enrichment, and the PostHog project must also be configured to discard IP data in Project Settings > General.
 
 ## Project layout
 
@@ -93,7 +141,9 @@ appcast.xml         Sparkle update feed
 
 Releases are driven by [Amore](http://amore.computer/) — it handles building, code signing, notarization, DMG creation, S3 upload, and Sparkle appcast publishing in one shot.
 
-Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `Version.xcconfig`, then:
+To prepare a release PR, start from latest `main`, update both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `Version.xcconfig`, and add the matching `CHANGELOG.md` entry with contributor credits. Submit these together in a ready PR; see the [release-process skill](.agents/skills/release-process/SKILL.md) for naming and validation.
+
+When ready to publish the prepared release, run the following from a clean working tree. This builds, notarizes, uploads, tags, and publishes the release:
 
 ```sh
 ./scripts/release.sh
@@ -101,7 +151,8 @@ Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `Version.xcconfig`, th
 
 Use `./scripts/rollback-release.sh` to revert the appcast pointer if a release misbehaves.
 
-## Contributing
+### Contributing
+
 
 Pull requests are welcome. For larger changes, please open an issue first to discuss what you'd like to change.
 
@@ -116,7 +167,7 @@ Pull requests are welcome. For larger changes, please open an issue first to dis
 
 <p align="center">
   <a href="https://pluk.sh">
-    <img src="docs/sponsors/pluk-logo.svg" height="54" alt="Pluk" />
+    <img src="docs/sponsors/pluk-logo.png" height="54" alt="Pluk" />
   </a>
   &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://amore.computer">
@@ -124,13 +175,18 @@ Pull requests are welcome. For larger changes, please open an issue first to dis
   </a>
 </p>
 
-## Acknowledgments
+## Support
 
+Markdown Preview is free and MIT-licensed. If it saved you a browser tab, you can [buy us a coffee](https://buymeacoffee.com/pluk).
+
+## Acknowledgments
+- [Amore](http://amore.computer/) — MacOS release automation (signing, notarization, DMG, hosting, appcast)
 - [swift-markdown](https://github.com/swiftlang/swift-markdown) — Markdown parser (Apple, cmark-gfm-backed)
-- [Mermaid](https://mermaid.js.org/) — bundled diagram renderer for `mermaid` fenced code blocks
-- [KaTeX](https://katex.org/) — bundled math typesetter for inline `$…$`, display `$$…$$`, and ` ```math ` blocks
+- [Mermaid](https://mermaid.js.org/) — Bundled diagram renderer for `mermaid` fenced code blocks
+- [KaTeX](https://katex.org/) — Bundled math typesetter for inline `$…$`, display `$$…$$`, and ` ```math ` blocks
 - [Sparkle](https://sparkle-project.org) — Auto-update framework
-- [Amore](http://amore.computer/) — macOS release automation (signing, notarization, DMG, hosting, appcast)
+- [Sentry](https://sentry.io) — Privacy-filtered native crash reporting
+- [LottieFiles](https://lottiefiles.com/) — Animated README logo
 
 ## License
 

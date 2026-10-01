@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>MarkdownPreviewAppGroupIdentifier</key>
+	<string>$(DEVELOPMENT_TEAM).doc.md-preview</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<key>QLIsDataBasedPreview</key>
-			<true/>
 			<key>QLSupportedContentTypes</key>
 			<array>
 				<string>public.markdown</string>
@@ -20,6 +20,7 @@
 				<string>doc.md-preview.mdwn</string>
 				<string>doc.md-preview.mdtxt</string>
 				<string>doc.md-preview.mdtext</string>
+				<string>doc.md-preview.mdx</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
@@ -27,7 +28,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).PreviewProvider</string>
+		<string>$(PRODUCT_MODULE_NAME).PreviewViewController</string>
 	</dict>
 </dict>
 </plist>

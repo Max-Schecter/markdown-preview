@@ -1,0 +1,576 @@
+import XCTest
+@testable import MarkdownHelpers
+
+// Info-string parsing is covered by CodeFenceInfoTests. This single test just
+// confirms the formatter wires that parser into the `language-` class so the
+// trailing metadata (e.g. ```mermaid some-name) does not leak into HTML.
+final class EscapingHTMLFormatterTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        TestVendor.installHighlighterGrammar()
+    }
+
+
+    func testBareURLFastPathHandlesUppercaseAndDecodedEntities() {
+        for markdown in ["HTTPS://example.com/", "h&#116;tp://example.com/", #"http\://example.com/"#] {
+            let html = EscapingHTMLFormatter.format(markdown)
+            XCTAssertTrue(html.contains("<a href="), html)
+        }
+        let html = EscapingHTMLFormatter.format("Ordinary prose with **bold text** and no URLs.")
+        XCTAssertFalse(html.contains("<a "), html)
+    }
+
+    func testBareURLsInIssue390ListBecomeLinks() {
+        let html = EscapingHTMLFormatter.format("* https://apple.com/\n* https://github.com/")
+        XCTAssertTrue(html.contains(#"<a href="https://apple.com/">https://apple.com/</a>"#), html)
+        XCTAssertTrue(html.contains(#"<a href="https://github.com/">https://github.com/</a>"#), html)
+    }
+
+    func testBareURLsPreservePunctuationUnicodeAndEscapeQueries() {
+        let html = EscapingHTMLFormatter.format("文 😀 (https://example.com/path). http://example.org/?a=1&b=2")
+        XCTAssertTrue(html.contains(#"(<a href="https://example.com/path">https://example.com/path</a>)."#), html)
+        XCTAssertTrue(html.contains(#"<a href="http://example.org/?a=1&amp;b=2">http://example.org/?a=1&amp;b=2</a>"#), html)
+    }
+
+    func testBareURLsDoNotNestInsideExistingLinksOrCode() {
+        for markdown in [
+            "[https://apple.com/](https://github.com/)",
+            "<https://apple.com/>",
+            #"<a href="https://github.com/"><em>https://apple.com/</em></a>"#,
+        ] {
+            let html = EscapingHTMLFormatter.format(markdown)
+            XCTAssertEqual(html.components(separatedBy: "<a ").count - 1, 1, html)
+        }
+        for markdown in [
+            "`https://apple.com/`", "```\nhttps://apple.com/\n```",
+            "<code>https://apple.com/</code>",
+            "![https://apple.com/](image.png)", "javascript:alert(1)",
+        ] {
+            let html = EscapingHTMLFormatter.format(markdown)
+            XCTAssertFalse(html.contains("<a "), html)
+        }
+        let html = EscapingHTMLFormatter.format("<code>https://apple.com/</code> https://github.com/")
+        XCTAssertTrue(html.contains(#"<a href="https://github.com/">"#), html)
+    }
+
+    func testBareURLsInEmphasisQuotesTablesAndHighlights() {
+        for markdown in [
+            "**https://apple.com/**", "> https://apple.com/",
+            "| URL |\n| --- |\n| https://apple.com/ |",
+            "==https://apple.com/==",
+        ] {
+            let html = EscapingHTMLFormatter.format(markdown)
+            XCTAssertTrue(html.contains(#"<a href="https://apple.com/">https://apple.com/</a>"#), html)
+        }
+    }
+
+    func testTaskCheckboxSourceTogglesExactSourceLine() {
+        let markdown = "- [ ] Same\n  - [x] Nested\n- [ ] Same\n"
+        XCTAssertEqual(
+            TaskCheckboxSource.settingChecked(true, onLine: 3, in: markdown),
+            "- [ ] Same\n  - [x] Nested\n- [x] Same\n"
+        )
+        XCTAssertEqual(
+            TaskCheckboxSource.settingChecked(false, onLine: 2, in: markdown),
+            "- [ ] Same\n  - [ ] Nested\n- [ ] Same\n"
+        )
+    }
+
+    func testTaskCheckboxSourceRejectsNonTaskLine() {
+        XCTAssertNil(TaskCheckboxSource.settingChecked(true, onLine: 1, in: "Plain text"))
+        XCTAssertNil(TaskCheckboxSource.settingChecked(true, onLine: 2, in: "- [ ] Task"))
+    }
+
+    func testTaskCheckboxSourceSupportsQuotedAndOrderedTasks() {
+        XCTAssertEqual(
+            TaskCheckboxSource.settingChecked(true, onLine: 1, in: "> 1. [ ] Quoted"),
+            "> 1. [x] Quoted"
+        )
+    }
+
+    func testFencedCodeBlockSetsLanguageClassFromFirstInfoWord() {
+        let html = EscapingHTMLFormatter.format("""
+        ```mermaid some-name
+        graph TD
+        ```
+        """)
+        XCTAssertTrue(
+            html.contains(#"<pre data-source-line="1" data-source-start="1" data-source-end="3"><code class="language-mermaid">"#),
+            "expected language-mermaid class (metadata after space ignored): \(html)"
+        )
+        XCTAssertFalse(
+            html.contains("some-name"),
+            "metadata after the language word must not leak into the class attribute: \(html)"
+        )
+    }
+
+    func testFencedCodeWithoutInfoStringGetsDetectedLanguageClass() {
+        let html = EscapingHTMLFormatter.format("""
+        ```
+        const answer = 42
+        ```
+        """)
+
+        XCTAssertTrue(
+            html.contains(#"<code class="language-javascript" data-md-detected-language="true" data-hljs-done="1">"#),
+            "expected detected language marker: \(html)"
+        )
+        XCTAssertTrue(html.contains(#"data-code-language="javascript""#))
+    }
+
+    func testCodeLanguageLabelPreservesExplicitAliasAndEscapesHTML() {
+        let shell = EscapingHTMLFormatter.format("```sh\necho hello\n```")
+        XCTAssertTrue(shell.contains(#"data-code-language="sh""#))
+        XCTAssertTrue(shell.contains(#"class="language-bash""#))
+        let escaped = EscapingHTMLFormatter.format("```a\"b\ntext\n```")
+        XCTAssertTrue(escaped.contains(#"data-code-language="a&quot;b""#))
+    }
+
+    func testFencedCodeWithAmbiguousSourceStaysWithoutLanguageClass() {
+        let html = EscapingHTMLFormatter.format("""
+        ```
+        just some prose
+        ```
+        """)
+
+        XCTAssertTrue(html.contains("<pre"), html)
+        // Stamped done so the page skips the deferred pass, but no language.
+        XCTAssertTrue(html.contains("<code data-hljs-done=\"1\">just some prose"), html)
+        XCTAssertFalse(html.contains("class=\"language-"), html)
+    }
+
+    func testGitHubAlertWithDefaultTitle() {
+        let html = EscapingHTMLFormatter.format("""
+        > [!IMPORTANT]
+        > Body text.
+        """)
+        XCTAssertTrue(
+            html.contains(#"<div class="markdown-alert markdown-alert-important">"#),
+            "expected alert wrapper: \(html)"
+        )
+        XCTAssertTrue(
+            html.contains(#"<p class="markdown-alert-title"><svg class="markdown-alert-icon""#),
+            "expected title with leading icon SVG: \(html)"
+        )
+        XCTAssertTrue(html.contains("Important</p>"), "expected default title text: \(html)")
+        XCTAssertTrue(html.contains("<p>Body text.</p>"), "expected body paragraph: \(html)")
+        XCTAssertFalse(html.contains("<blockquote"), "alert should replace blockquote: \(html)")
+    }
+
+    func testGitHubAlertWithCustomTitle() {
+        let html = EscapingHTMLFormatter.format("""
+        > [!WARNING] Something specific
+        > Multi
+        > line body.
+        """)
+        XCTAssertTrue(html.contains("markdown-alert-warning"), "expected warning kind: \(html)")
+        XCTAssertTrue(html.contains("Something specific</p>"), "expected custom title text: \(html)")
+        XCTAssertTrue(
+            html.contains("Multi<br />\nline body."),
+            "expected body line break to remain visible: \(html)"
+        )
+    }
+
+    func testSoftBreakRendersAsVisibleLineBreak() {
+        let html = EscapingHTMLFormatter.format("First line\nSecond line")
+        XCTAssertTrue(
+            html.contains("First line<br />\nSecond line"),
+            "expected a source newline to remain visible: \(html)"
+        )
+    }
+
+    func testOnlyDoubleTildesRenderAsStrikethrough() {
+        let html = EscapingHTMLFormatter.format("~single~ and ~~double~~")
+
+        XCTAssertTrue(
+            html.contains("~single~ and <del>double</del>"),
+            "expected single tildes to remain visible and double tildes to strike through: \(html)"
+        )
+        XCTAssertFalse(html.contains("<del>single</del>"), html)
+    }
+
+    func testSingleTildesPreserveNestedInlineFormatting() {
+        let html = EscapingHTMLFormatter.format("~**important**~ and ~~**obsolete**~~")
+
+        XCTAssertTrue(html.contains("~<strong>important</strong>~"), html)
+        XCTAssertTrue(html.contains("<del><strong>obsolete</strong></del>"), html)
+    }
+
+    func testTildeDelimiterDetectionUsesUTF8SourceColumns() {
+        let html = EscapingHTMLFormatter.format("中文 ~保留~，~~删除~~")
+
+        XCTAssertTrue(html.contains("中文 ~保留~，<del>删除</del>"), html)
+    }
+
+    func testTildeDelimiterDetectionUsesParsedMarkdown() {
+        let html = EscapingHTMLFormatter.format(
+            "~visible~",
+            sourceMarkdown: "source mapping without a tilde"
+        )
+
+        XCTAssertTrue(html.contains("~visible~"), html)
+        XCTAssertFalse(html.contains("<del>visible</del>"), html)
+    }
+
+    func testFenceLanguageLabelUsesParsedMarkdown() {
+        for fence in ["```", "~~~"] {
+            let html = EscapingHTMLFormatter.format(
+                "\(fence)swift\nlet value = 1\n\(fence)",
+                sourceMarkdown: "Different source mapping\nlet value = 1\nend")
+            XCTAssertTrue(html.contains("data-code-language=\"swift\""), html)
+        }
+    }
+
+    func testEveryPrecedingBlankSourceLineIsRecorded() {
+        let html = EscapingHTMLFormatter.format("First paragraph.\n\n\nSecond paragraph.")
+        XCTAssertTrue(
+            html.contains(
+                "<div class=\"md-source-blank-line\" aria-hidden=\"true\"></div>\n<div class=\"md-source-blank-line\" aria-hidden=\"true\"></div>\n<p data-source-line=\"4\" data-source-start=\"4\" data-source-end=\"4\">Second paragraph.</p>"
+            ),
+            "expected every empty source line to be preserved: \(html)"
+        )
+        XCTAssertEqual(html.components(separatedBy: "md-source-blank-line").count - 1, 2)
+    }
+
+    func testSourceMarkdownExcludesRemovedContentFromBlankLineCount() {
+        let html = EscapingHTMLFormatter.format(
+            "Before.\n\n\n\nAfter.",
+            sourceMarkdown: "Before.\n\n[^note]: Removed.\n\nAfter."
+        )
+        XCTAssertTrue(html.contains(
+            "<p data-source-line=\"5\" data-source-start=\"5\" data-source-end=\"5\">After.</p>"
+        ))
+        XCTAssertEqual(html.components(separatedBy: "md-source-blank-line").count - 1, 1)
+    }
+
+    func testGitHubAlertTagIsCaseInsensitive() {
+        let html = EscapingHTMLFormatter.format("> [!tIp] Pro move")
+        XCTAssertTrue(
+            html.contains(#"<div class="markdown-alert markdown-alert-tip">"#),
+            "case-insensitive tag should match: \(html)"
+        )
+        XCTAssertTrue(html.contains("Pro move</p>"), "expected custom title text: \(html)")
+    }
+
+    func testGitHubAlertSupportsInlineFormattingInCustomTitle() {
+        let html = EscapingHTMLFormatter.format("> [!NOTE] With **bold** title")
+        XCTAssertTrue(
+            html.contains("With <strong>bold</strong> title</p>"),
+            "inline formatting in title should be rendered: \(html)"
+        )
+    }
+
+    func testGitHubAlertIncludesOcticonSVG() {
+        let html = EscapingHTMLFormatter.format("> [!NOTE]")
+        XCTAssertTrue(
+            html.contains(#"<svg class="markdown-alert-icon" viewBox="0 0 16 16""#),
+            "expected Octicon SVG markup: \(html)"
+        )
+        XCTAssertTrue(html.contains("<path d=\""), "expected path data: \(html)")
+    }
+
+    func testUnknownAlertTagFallsBackToBlockquote() {
+        let html = EscapingHTMLFormatter.format("> [!FOO] Nope")
+        XCTAssertTrue(
+            html.contains(#"<blockquote data-source-line="1" data-source-start="1" data-source-end="1">"#),
+            "unknown tag should be a source-mapped plain blockquote: \(html)"
+        )
+        XCTAssertFalse(html.contains("markdown-alert"), "no alert wrapper for unknown tag: \(html)")
+    }
+
+    func testQuotedBlankLinesRenderAsPlainBlockquote() {
+        let html = EscapingHTMLFormatter.format("""
+        > All canon is stored as markdown files.
+        >
+        > Markdown files are the authoritative source of truth.
+        >
+        > Agent modifications must be applied through patches whenever possible.
+        >
+        > Generated content is disposable.
+        >
+        > Canon is permanent.
+        """)
+
+        XCTAssertTrue(
+            html.contains(#"<blockquote data-source-line="1" data-source-start="1" data-source-end="9">"#),
+            "expected source-mapped plain blockquote wrapper: \(html)"
+        )
+        XCTAssertTrue(
+            html.contains(#"<p data-source-line="1" data-source-start="1" data-source-end="1">All canon is stored as markdown files.</p>"#),
+            "expected first quote paragraph: \(html)"
+        )
+        XCTAssertTrue(
+            html.contains(#"<p data-source-line="9" data-source-start="9" data-source-end="9">Canon is permanent.</p>"#),
+            "expected final quote paragraph: \(html)"
+        )
+        XCTAssertFalse(html.contains("<pre><code"), "blockquote must not render as a code block: \(html)")
+    }
+
+    func testGitHubAlertEscapesPlainTextInCustomTitle() {
+        // Ampersands and lone `<`/`>` in text should round-trip as entities.
+        // Inline HTML (e.g. <script>) is parsed as InlineHTML and passed
+        // through by design — DOMPurify handles that at render time.
+        let html = EscapingHTMLFormatter.format("> [!CAUTION] R&D < 5")
+        XCTAssertTrue(
+            html.contains("R&amp;D &lt; 5"),
+            "custom title plain text must be HTML-escaped: \(html)"
+        )
+    }
+
+    func testObsidianHighlightSyntaxRendersAsMark() {
+        let html = EscapingHTMLFormatter.format("before ==Highlighted text== after")
+        XCTAssertTrue(
+            html.contains("before <mark class=\"md-highlight\">Highlighted text</mark> after"),
+            "double-equals text should render as a semantic highlight: \(html)"
+        )
+    }
+
+    func testObsidianHighlightPreservesNestedInlineFormatting() {
+        let html = EscapingHTMLFormatter.format("==**bold** and *italic*==")
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\"><strong>bold</strong> and <em>italic</em></mark>"),
+            "nested Markdown should remain inside the highlight: \(html)"
+        )
+    }
+
+    func testObsidianHighlightDoesNotRenderInsideCodeOrWithWhitespaceDelimiters() {
+        let html = EscapingHTMLFormatter.format("`==code==` and == open == and ==unclosed")
+        XCTAssertTrue(html.contains("<code>==code==</code>"), html)
+        XCTAssertTrue(html.contains("== open =="), html)
+        XCTAssertTrue(html.contains("==unclosed"), html)
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightDoesNotRenderInsideIndentedCode() {
+        let html = EscapingHTMLFormatter.format("    ==indented code==")
+
+        XCTAssertTrue(html.contains("<code data-hljs-done=\"1\">==indented code=="), html)
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightEscapesHTMLText() {
+        let html = EscapingHTMLFormatter.format("==R&D < 5==")
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">R&amp;D &lt; 5</mark>"),
+            "highlight contents must use the formatter's HTML escaping: \(html)"
+        )
+    }
+
+    func testObsidianHighlightSkipsFencedCodeLinksAndEscapedDelimiters() {
+        let html = EscapingHTMLFormatter.format("""
+        ```
+        ==inside code==
+        ```
+
+        [URL](https://example.com/?a==b==c)
+
+        \\==literal\\== and ==visible==
+        """)
+
+        XCTAssertTrue(html.contains("==inside code=="), html)
+        XCTAssertTrue(html.contains("href=\"https://example.com/?a==b==c\""), html)
+        XCTAssertTrue(html.contains("==literal=="), html)
+        XCTAssertTrue(html.contains("<mark class=\"md-highlight\">visible</mark>"), html)
+        XCTAssertEqual(html.components(separatedBy: "<mark class=\"md-highlight\">").count - 1, 1, html)
+    }
+
+    func testObsidianHighlightSupportsAdjacentAndRawHTMLBoundaries() {
+        let html = EscapingHTMLFormatter.format("""
+        <div>==raw HTML==</div>
+
+        ==one== ==two==
+        """)
+
+        XCTAssertTrue(html.contains("<div>==raw HTML==</div>"), html)
+        XCTAssertTrue(html.contains("<mark class=\"md-highlight\">one</mark> <mark class=\"md-highlight\">two</mark>"), html)
+        XCTAssertEqual(html.components(separatedBy: "<mark class=\"md-highlight\">").count - 1, 2, html)
+    }
+
+    func testObsidianHighlightDoesNotCrossAParagraphBoundary() {
+        let html = EscapingHTMLFormatter.format("""
+        ==opens here
+
+        closes here==
+        """)
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        XCTAssertTrue(html.contains("==opens here"), html)
+        XCTAssertTrue(html.contains("closes here=="), html)
+    }
+
+    func testObsidianHighlightDoesNotCrossAHeadingBoundary() {
+        let html = EscapingHTMLFormatter.format("""
+        ==opens here
+        # A heading
+        closes here==
+        """)
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        XCTAssertTrue(html.contains("<h1"), html)
+        XCTAssertTrue(html.contains("==opens here"), html)
+        XCTAssertTrue(html.contains("closes here=="), html)
+    }
+
+    func testObsidianHighlightClosingDelimiterIsNotReusedAsAnOpener() {
+        let html = EscapingHTMLFormatter.format("==one==two== after")
+
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">one</mark>two== after"),
+            html
+        )
+    }
+
+    func testObsidianHighlightPreservesTabIndentedCode() {
+        for prefix in ["\t", " \t", "  \t", "   \t"] {
+            let html = EscapingHTMLFormatter.format("\(prefix)==literal==")
+
+            XCTAssertTrue(html.contains("<code data-hljs-done=\"1\">==literal=="), html)
+            XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        }
+    }
+
+    func testObsidianHighlightPreservesReferenceDefinitionDestinationAndTitle() {
+        let markdown = """
+        [link][id]
+
+        [id]: https://example.com/?a==b==c "title ==literal=="
+        """
+        let html = EscapingHTMLFormatter.format(markdown)
+
+        XCTAssertTrue(html.contains("href=\"https://example.com/?a==b==c\""), html)
+        XCTAssertFalse(html.contains(MarkdownHighlightSource.openingToken), html)
+        XCTAssertFalse(html.contains(MarkdownHighlightSource.closingToken), html)
+        XCTAssertEqual(MarkdownHighlightSource.preparing(markdown), markdown)
+    }
+
+    func testObsidianHighlightDoesNotCrossEmphasisBoundary() {
+        let html = EscapingHTMLFormatter.format("==*hello== world*")
+
+        XCTAssertTrue(html.contains("==<em>hello== world</em>"), html)
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightDoesNotCrossLinkBoundary() {
+        let html = EscapingHTMLFormatter.format("==[hello==](https://example.com)")
+
+        XCTAssertTrue(
+            html.contains("==<a href=\"https://example.com\">hello==</a>"),
+            html
+        )
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightCanContainCompleteNestedInlineMarkup() {
+        let html = EscapingHTMLFormatter.format("==hello *world*==")
+
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">hello <em>world</em></mark>"),
+            html
+        )
+    }
+
+    func testObsidianHighlightDoesNotCrossTableCells() {
+        let html = EscapingHTMLFormatter.format("""
+        | ==one | two== |
+        | --- | --- |
+        """)
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        XCTAssertTrue(html.contains("==one"), html)
+        XCTAssertTrue(html.contains("two=="), html)
+    }
+
+    func testObsidianHighlightDoesNotCrossInlineHTML() {
+        let html = EscapingHTMLFormatter.format("==<span>hello==</span>")
+
+        XCTAssertTrue(html.contains("==<span>hello==</span>"), html)
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightUsesUTF8LocationsAfterCommonMarkLineEndings() {
+        for lineEnding in ["\n", "\r\n", "\r"] {
+            let html = EscapingHTMLFormatter.format(
+                "first\(lineEnding)second ==highlighted=="
+            )
+
+            XCTAssertTrue(
+                html.contains("second <mark class=\"md-highlight\">highlighted</mark>"),
+                html
+            )
+        }
+    }
+
+    func testObsidianHighlightDoesNotCrossNestedInlineHTML() {
+        let html = EscapingHTMLFormatter.format("==before *</mark>* after==")
+
+        XCTAssertTrue(html.contains("==before <em></mark></em> after=="), html)
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+    }
+
+    func testObsidianHighlightSupportsAContinuationLineInAQuotedParagraph() {
+        let html = EscapingHTMLFormatter.format("> ==Quoted highlight\n> continues here==")
+
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">Quoted highlight")
+                && html.contains("continues here</mark>"),
+            html
+        )
+    }
+
+    func testObsidianHighlightSupportsAContinuationLineInAListParagraph() {
+        let html = EscapingHTMLFormatter.format("- ==List highlight\n  continues here==")
+
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">List highlight")
+                && html.contains("continues here</mark>"),
+            html
+        )
+    }
+
+    func testObsidianHighlightDoesNotCrossListItems() {
+        let html = EscapingHTMLFormatter.format("- ==opens here\n- closes here==")
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        XCTAssertTrue(html.contains("==opens here"), html)
+        XCTAssertTrue(html.contains("closes here=="), html)
+    }
+
+    func testObsidianHighlightDoesNotLetAnUnclosedCodeSpanHideTheNextParagraph() {
+        let html = EscapingHTMLFormatter.format("`unclosed\n\n==Highlight between paragraphs==\n\n`")
+
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">Highlight between paragraphs</mark>"),
+            html
+        )
+    }
+
+    func testObsidianHighlightPreservesAValidMultilineCodeSpan() {
+        for lineEnding in ["\n", "\r\n", "\r"] {
+            let html = EscapingHTMLFormatter.format("`code\(lineEnding)==literal==`")
+
+            XCTAssertTrue(html.contains("<code>"), html)
+            XCTAssertTrue(html.contains("==literal=="), html)
+            XCTAssertFalse(html.contains("<mark class=\"md-highlight\">"), html)
+        }
+    }
+
+    func testObsidianHighlightDoesNotConsumeABothSidedDelimiterFromAnotherParagraph() {
+        let html = EscapingHTMLFormatter.format("==unclosed\n\nword==valid==")
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">unclosed"), html)
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">valid</mark>"),
+            html
+        )
+    }
+
+    func testObsidianHighlightDoesNotConsumeABothSidedDelimiterFromAnotherListItem() {
+        let html = EscapingHTMLFormatter.format("- ==unclosed\n- word==valid==")
+
+        XCTAssertFalse(html.contains("<mark class=\"md-highlight\">unclosed"), html)
+        XCTAssertTrue(
+            html.contains("<mark class=\"md-highlight\">valid</mark>"),
+            html
+        )
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "upstream": "be03f333141af032c9a18220712c763c6cf30d25",
+  "helper_tests": {
+    "passed": 57,
+    "failed": 0
+  },
+  "full_suite": {
+    "completed": false,
+    "observed_passed": 136,
+    "failed_cases": 7
+  },
+  "static_math_mermaid": "passed",
+  "editor_transition_probes": "passed",
+  "checkbox_conflict_probes": "passed",
+  "macos_build": "in progress",
+  "ios_generic_simulator_build": "in progress",
+  "interactive_validation": "not run",
+  "audit": "No recognized private-key/provider-token pattern matched; heuristic scan limitations and intentional public history described in fork-review.md."
+}
