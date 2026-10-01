@@ -18,13 +18,19 @@ This review branch updates the fork to upstream main `be03f333141af032c9a1822071
 - 64 rendering regression tests passed after updating the table-editing contract assertions.
 - Math/Mermaid smoke checks passed.
 - Editor-transition/zoom and checkbox save/conflict probes passed in the sanitized candidate using a fresh absolute compiler-cache path.
-- The full Swift suite compiled, but the run was stopped after 136 observed passing test cases and seven failing editor-formatting test cases. The editor Swift source, bundled editor JavaScript and affected test file are unchanged from upstream. A pristine-upstream baseline is still required to attribute the failures conclusively.
+- The initial seven editor-formatting failures reproduced on pristine upstream. An unordered, invisible, non-key window in the test harness restores native WebKit focus/blur delivery without activating the application. All 25 upstream formatting tests passed with this harness; all 26 candidate formatting tests, including a new focus regression, passed.
+- The completed candidate run executed 455 tests, with one skipped and nine failed assertions in one case: the inherited read-only table contract. That run preceded the table capability fix below; it is not a clean full-suite result.
+- Table mutation now requires an explicit main-app capability as well as a host bridge. Generic preview hosts and Quick Look remain read-only. Eight lightweight DOM capability combinations passed. New native regression coverage includes initial, morphdom and fallback updates; it has not yet been run after this fix.
+- 36 performance comparison/reporting unit tests passed. The initial performance CI failed because the old fork has no editor benchmark target. For that exact migration base only, the runner now compares against the reconciled upstream commit, verifies its ancestry, and records both requested and actual baselines. This measures fork overhead against upstream; no old-fork performance comparison is claimed. The actual benchmark remains pending.
+- The editor bundle rebuilt byte-for-byte from its source. Its DOM smoke suite exposed an incomplete image-click gesture, now corrected. Other runs had varying syntax/render readiness failures under host contention; the complete DOM smoke suite is not verified green.
 - Xcode project and plist syntax checks passed. The unsigned iOS/iPad build succeeded for generic iOS Simulator (arm64 and x86_64). The unsigned macOS Debug build, including Quick Look, also succeeded.
 - No app was installed or launched for interactive testing. No simulator was booted or used. Signing, notarization, publishing and updater services were not exercised.
 
-Failing WebKit cases observed in `EditorFormattingTests`: missing table cells, formatting after blur, table click anchoring, formatting with pipes/whitespace/Unicode/empty cells, stale targets after document replacement, table link/keyboard formatting, and native pointer selection.
+The final capability/test/benchmark follow-up has not received another native build or full test run. Heavy local checks were stopped after the completed run because other tasks reported severe host contention. GitHub CI on the follow-up is the next independent validation step.
 
 ## Security and privacy review
+
+See [history-privacy.md](history-privacy.md) for audit coverage and the personal information retained in existing public history.
 
 All 2,646 objects from the original repository were covered by redacted object scans, including original-only objects absent from a normal clone. Working-tree scanning included ignored local files. No private-key or recognized provider-token pattern matched. Historical author emails/signing identifiers and ignored local machine paths were identified. Private local history, ignored files and raw audit/build logs are not included in this branch.
 
@@ -34,6 +40,6 @@ The existing GitHub fork is already public. This branch does not erase or rewrit
 
 ## Before merge or binary distribution
 
-Resolve or establish the baseline for the WebKit failures. Verify rendered table typing/focus, row/column operations, undo/redo, external-file conflicts and transitions between read/edit modes. Exercise iOS file opening, security-scoped persistence, searchable recents and appearance. Verify Quick Look in its real host.
+Require a clean follow-up Swift CI run and inspect the performance results. Resolve the remaining DOM smoke failures or establish their isolated baseline. Verify rendered table typing/focus, row/column operations, undo/redo, external-file conflicts and transitions between read/edit modes. Exercise iOS file opening, security-scoped persistence, searchable recents and appearance. Verify Quick Look in its real host.
 
 Choose fork-owned bundle identifiers/app groups, branding/support links and a version before signing or distributing. Upstream links and identifiers remain where explicitly documented in `FORK.md`. Re-enable distribution scripts and service integrations only after configuring and reviewing fork-owned infrastructure.

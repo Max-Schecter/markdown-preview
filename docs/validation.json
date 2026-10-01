@@ -5,9 +5,12 @@
     "failed": 0
   },
   "full_suite": {
-    "completed": false,
-    "observed_passed": 136,
-    "failed_cases": 7
+    "completed": true,
+    "executed": 455,
+    "skipped": 1,
+    "failed_cases": 1,
+    "failed_assertions": 9,
+    "scope": "Before explicit table capability fix; not rerun after final source changes"
   },
   "static_math_mermaid": "passed",
   "editor_transition_probes": "passed",
@@ -19,5 +22,26 @@
   "rendering_tests": {
     "passed": 64,
     "failed": 0
-  }
+  },
+  "editor_formatting": {
+    "pristine_upstream_with_window_harness": {
+      "passed": 25,
+      "failed": 0
+    },
+    "candidate_with_window_harness": {
+      "passed": 26,
+      "failed": 0
+    }
+  },
+  "table_capability_dom_probe": {
+    "passed_combinations": 8,
+    "native_regression": "added, not yet run"
+  },
+  "performance_harness_unit_tests": {
+    "passed": 36,
+    "failed": 0
+  },
+  "performance_measurement": "pending; exact legacy fork base uses verified upstream baseline with disclosure",
+  "editor_jsdom_smoke": "not green; incomplete image gesture fixed, variable syntax/render readiness failures remain",
+  "final_followup_native_build": "not run due severe shared host contention"
 }

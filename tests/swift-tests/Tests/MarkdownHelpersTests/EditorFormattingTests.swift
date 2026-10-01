@@ -4,6 +4,39 @@ import XCTest
 
 @MainActor
 final class EditorFormattingTests: XCTestCase {
+    func testHeadlessTableFocusDeliversNativeEventsWithoutShowingAWindow() async throws {
+        let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
+        let editor = WebViewLayoutHarness(
+            html: EditorHTML.render(markdown: "| Name |\n| --- |\n| Ada |", editorJavaScript: script),
+            width: 650, isEditor: true, height: 400
+        )
+        defer { editor.close() }
+        _ = try await editor.layout(texts: [], imageCount: 0)
+        XCTAssertNotNil(editor.webView.window)
+        XCTAssertEqual(editor.webView.window?.isVisible, false)
+        XCTAssertEqual(editor.webView.window?.isKeyWindow, false)
+        let result = try await editor.webView.evaluateJavaScript("""
+            (() => {
+                const cell = document.querySelector('[data-table-row="1"][data-table-column="0"]');
+                let focused = 0, blurred = 0;
+                cell.addEventListener('focus', () => focused++);
+                cell.addEventListener('blur', () => blurred++);
+                cell.focus();
+                const editing = cell.dataset.tableEditing === 'true';
+                const active = document.activeElement === cell;
+                cell.blur();
+                return {focused, blurred, editing, active, ended: cell.dataset.tableEditing !== 'true'};
+            })()
+            """) as? [String: Any]
+        XCTAssertEqual(result?["focused"] as? Int, 1)
+        XCTAssertEqual(result?["blurred"] as? Int, 1)
+        for key in ["editing", "active", "ended"] {
+            XCTAssertEqual(result?[key] as? Bool, true, key)
+        }
+        XCTAssertEqual(editor.webView.window?.isVisible, false)
+        XCTAssertEqual(editor.webView.window?.isKeyWindow, false)
+    }
+
     func testFormattingMissingTableCellsDoesNotTargetBodySelection() async throws {
         let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
         for command in ["bold", "keyboard", "link"] {

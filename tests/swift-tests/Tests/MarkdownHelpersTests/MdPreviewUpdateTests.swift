@@ -387,6 +387,34 @@ final class MdPreviewUpdateTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testTableMutationRequiresExplicitHostCapabilityAcrossUpdates() async throws {
+        for allowed in [false, true] {
+            let webView = try await loadHarness(articleAttributes: "", stubsWebKitMessageHandler: true,
+                                                allowsTableEditing: allowed)
+            let article = MarkdownHTML.javaScriptStringLiteral(MarkdownHTML.render(
+                markdown: "| A | B |\n| --- | --- |\n| C | D |", vendorLoading: .lazy
+            ).articleHTML)
+            for path in ["initial", "morph", "fallback"] {
+                if path == "fallback" {
+                    _ = try await webView.evaluateJavaScript("window.morphdom = undefined; true")
+                }
+                _ = try await webView.evaluateJavaScript("MdPreview.update(\(article)); true")
+                let result = try await webView.evaluateJavaScript("""
+                (() => {
+                    window.__hostMessages = [];
+                    const changed = window.MdPreviewTables.perform('insertRowBelow', 0, 1, 0);
+                    return { changed, rows: document.querySelectorAll('table tr').length,
+                        edits: window.__hostMessages.filter(m => m.kind === 'tableEdit').length };
+                })()
+                """) as! [String: Any]
+                XCTAssertEqual(result["changed"] as? Bool, allowed, path)
+                XCTAssertEqual(result["rows"] as? Int, allowed ? 3 : 2, path)
+                XCTAssertEqual(result["edits"] as? Int, allowed ? 1 : 0, path)
+            }
+        }
+    }
+
     /// Builds the harness page — bundled DOMPurify + morphdom, the shipped
     /// host bridge, and fake renderers that mimic the real markers: stash
     /// `__mdSrc`, set the done flag, replace the children with a sentinel,
@@ -395,13 +423,15 @@ final class MdPreviewUpdateTests: XCTestCase {
     @MainActor
     private func loadHarness(
         articleAttributes: String,
-        stubsWebKitMessageHandler: Bool = false
+        stubsWebKitMessageHandler: Bool = false,
+        allowsTableEditing: Bool = false
     ) async throws -> WKWebView {
         let purifyJS = try TestVendor.script("md-preview/Vendor/DOMPurify/purify.min.js")
         let morphdomJS = try TestVendor.script("md-preview/Vendor/Morphdom/morphdom.min.js")
         let webKitMessageHandlerStub = stubsWebKitMessageHandler
             ? """
               <script>
+              window.mdPreviewAllowsTableEditing = \(allowsTableEditing ? "true" : "false");
               window.webkit = {
                   messageHandlers: {
                       mdPreviewHost: { postMessage(message) { (window.__hostMessages ||= []).push(message); } }

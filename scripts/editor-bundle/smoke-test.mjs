@@ -540,10 +540,22 @@ image?.dispatchEvent(new dom.window.MouseEvent("click", {
 }))
 check("clicking a local image requests its native rename flow",
   requestedImageRename === "md-asset:///test-pictures/1.png")
+// A real single click has detail=1 and a matching mouseup. Otherwise the
+// editor correctly retains its pointer/drag snapshot until the gesture ends.
 imageSource?.dispatchEvent(new dom.window.MouseEvent("mousedown", {
   bubbles: true,
   cancelable: true,
+  button: 0,
+  buttons: 1,
+  detail: 1,
 }))
+dom.window.document.dispatchEvent(new dom.window.MouseEvent("mouseup", {
+  bubbles: true,
+  button: 0,
+  buttons: 0,
+  detail: 1,
+}))
+await new Promise(resolve => setTimeout(resolve, 0))
 check("clicking image source restores editable Markdown without changing it",
   imageHost.querySelector(".cm-md-image-preview") == null
     && imageHost.querySelector(".cm-md-image-line") == null

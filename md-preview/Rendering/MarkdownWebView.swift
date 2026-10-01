@@ -242,6 +242,12 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(assetScheme, forURLScheme: MarkdownAssetScheme.scheme)
         config.userContentController.addUserScript(Self.disableContextMenuScript)
+        #if !QUICK_LOOK_EXTENSION
+        config.userContentController.addUserScript(WKUserScript(
+            source: "window.mdPreviewAllowsTableEditing = true;",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true
+        ))
+        #endif
         config.userContentController.add(messageBridge, name: HostBridge.name)
         Self.disableUserInstalledFonts(in: config.preferences)
         webView = PreviewWKWebView(frame: .zero, configuration: config)

@@ -27,6 +27,24 @@ def revision(value: str) -> str:
     return subprocess.check_output(["git", "rev-parse", "--verify", value + "^{commit}"], cwd=ROOT, text=True).strip()
 
 
+# The original fork predates the editor and cannot run this benchmark. Only
+# this exact migration base uses the reconciled upstream as a comparison.
+MIGRATION_BASE = "fd5f59f5a7a09c9819ef7e893a37f383e15eb27b"
+MIGRATION_UPSTREAM = "be03f333141af032c9a18220712c763c6cf30d25"
+
+
+def comparison_base(requested: str, candidate: str) -> tuple[str, str]:
+    if requested != MIGRATION_BASE:
+        return requested, ""
+    run(["git", "merge-base", "--is-ancestor", MIGRATION_UPSTREAM, candidate], cwd=ROOT)
+    return MIGRATION_UPSTREAM, (
+        "Migration baseline: the original fork predates the editor benchmark. "
+        f"Compared against reconciled upstream `{MIGRATION_UPSTREAM}` instead of "
+        f"PR base `{requested}`. This measures fork overhead relative to upstream, "
+        "not a speed comparison with the old fork.\n\n"
+    )
+
+
 def legacy_editor(snapshot: Path) -> str:
     """Adapt the pre-extraction page for this PR's first baseline, preserving its HTML/CSS/JS."""
     old = (snapshot / "md-preview/Features/Editor/EditorViewController.swift").read_text()
@@ -138,7 +156,9 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     if (out / "work").exists():
         parser.error("Use a new output directory; previous benchmark work exists")
-    refs = {"baseline": revision(args.base), "candidate": revision(args.candidate)}
+    requested_base, candidate = revision(args.base), revision(args.candidate)
+    baseline, baseline_note = comparison_base(requested_base, candidate)
+    refs = {"baseline": baseline, "candidate": candidate, "requested_base": requested_base}
     (out / "revisions.json").write_text(json.dumps(refs, indent=2))
     (out / "environment.json").write_text(json.dumps({
         "platform": platform.platform(), "architecture": platform.machine(),
@@ -148,7 +168,7 @@ def main() -> None:
     summary = out / "summary.md"
     summary.write_text("# Performance comparison\n\n**ERROR — benchmark did not finish**\n\nInspect the build/run logs in the artifact.\n")
     try:
-        executables = {label: prepare(label, commit, out) for label, commit in refs.items()}
+        executables = {label: prepare(label, refs[label], out) for label in ("baseline", "candidate")}
         fixture = out / "mixed.md"
         shutil.copy2(ROOT / "tests/performance/mixed.md", fixture)
         # ABBA balances warm caches / runner drift. Never measure both builds
@@ -164,6 +184,8 @@ def main() -> None:
              "--candidate", str(out / "candidate-1.json"), str(out / "candidate-2.json"),
              "--summary", str(summary)])
     finally:
+        if baseline_note:
+            summary.write_text(baseline_note + summary.read_text())
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as stream:
                 stream.write(summary.read_text())

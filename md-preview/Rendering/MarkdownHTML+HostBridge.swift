@@ -671,6 +671,10 @@ nonisolated extension MarkdownHTML {
         // which clears the inline style and reveals the article.
         window.MdPreview.markdownForSelection = markdownForSelection;
 
+        // A message bridge alone does not grant table mutation capability.
+        const canEditTables = hasHostBridge && \(allowsRenderedTableEditing ? "true" : "false")
+            && window.mdPreviewAllowsTableEditing === true;
+
         function tableCells(table) {
             return Array.from(table.querySelectorAll('thead tr, tbody tr, :scope > tr')).map((row) =>
                 Array.from(row.children).filter((cell) => cell.matches('th, td'))
@@ -686,6 +690,7 @@ nonisolated extension MarkdownHTML {
         }
 
         function postTableEdit(table, force, actionName) {
+            if (!canEditTables) return;
             const tableIndex = Number.parseInt(table.dataset.mdTableIndex || '-1', 10);
             if (!Number.isInteger(tableIndex) || tableIndex < 0) return;
             if (!force && table.dataset.mdTableDirty !== '1') return;
@@ -753,6 +758,7 @@ nonisolated extension MarkdownHTML {
         }
 
         function activateEditableCell(cell) {
+            if (!canEditTables) return false;
             if (!cell || cell.dataset.mdTableEditable !== '1') return false;
             if (cell.getAttribute('contenteditable') !== 'plaintext-only') {
                 cell.setAttribute('contenteditable', 'plaintext-only');
@@ -762,7 +768,7 @@ nonisolated extension MarkdownHTML {
         }
 
         function decorateTables() {
-            if (!hasHostBridge || !\(allowsRenderedTableEditing ? "true" : "false")) return;
+            if (!canEditTables) return;
             document.querySelectorAll('table[data-md-table-index]').forEach((table) => {
                 table.classList.add('md-editable-table');
                 const rows = tableCells(table);
@@ -775,6 +781,7 @@ nonisolated extension MarkdownHTML {
         }
 
         function tableContextFromPoint(target, clientX, clientY) {
+            if (!canEditTables) return;
             const table = target && target.closest
                 ? target.closest('table[data-md-table-index]')
                 : null;
@@ -889,6 +896,7 @@ nonisolated extension MarkdownHTML {
 
         window.MdPreviewTables = {
             perform(command, tableIndex, rowIndex, columnIndex) {
+                if (!canEditTables) return false;
                 const table = document.querySelector('table[data-md-table-index="' + tableIndex + '"]');
                 if (!table) return false;
                 const rows = tableCells(table);

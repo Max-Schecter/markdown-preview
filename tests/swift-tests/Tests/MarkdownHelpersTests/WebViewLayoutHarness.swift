@@ -29,6 +29,7 @@ final class WebViewLayoutHarness {
     }
 
     let webView: WKWebView
+    private let hostWindow: NSWindow
     private let html: String
     private let isEditor: Bool
 
@@ -64,12 +65,26 @@ final class WebViewLayoutHarness {
             """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height),
                             configuration: configuration)
+        // Detached WebKit updates activeElement without delivering native focus
+        // and blur events. Table editing relies on those events to own selection.
+        // An unordered host restores delivery without a visible/key window or
+        // application activation, so command-line tests cannot steal user focus.
+        _ = NSApplication.shared
+        hostWindow = NSWindow(
+            contentRect: NSRect(x: -10000, y: -10000, width: width, height: height),
+            styleMask: .borderless, backing: .buffered, defer: true
+        )
+        hostWindow.isReleasedWhenClosed = false
+        hostWindow.contentView = webView
+        hostWindow.makeFirstResponder(webView)
         webView.pageZoom = zoom
         webView.loadHTMLString(html, baseURL: nil)
     }
 
     func close() {
         webView.stopLoading()
+        hostWindow.contentView = nil
+        hostWindow.close()
     }
 
     func layout(texts: [String], imageCount: Int,

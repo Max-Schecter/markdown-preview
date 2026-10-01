@@ -3,10 +3,20 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from run_performance import prepare_sources
+from run_performance import prepare_sources, comparison_base, MIGRATION_BASE, MIGRATION_UPSTREAM
 
 
 class PerformanceSourceTests(unittest.TestCase):
+    def test_only_exact_migration_base_uses_verified_upstream(self):
+        with patch('run_performance.run') as command:
+            self.assertEqual(comparison_base('other-base', 'candidate'), ('other-base', ''))
+            command.assert_not_called()
+            base, note = comparison_base(MIGRATION_BASE, 'candidate')
+            self.assertEqual(base, MIGRATION_UPSTREAM)
+            self.assertIn('not a speed comparison with the old fork', note)
+            self.assertEqual(command.call_args.args[0],
+                             ['git', 'merge-base', '--is-ancestor', MIGRATION_UPSTREAM, 'candidate'])
+
     def snapshot(self, root, name):
         snapshot = root / name
         helpers = snapshot / 'tests/swift-tests/Sources/MarkdownHelpers'
