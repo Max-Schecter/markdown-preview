@@ -15,10 +15,11 @@ This review branch updates the fork to upstream main `be03f333141af032c9a1822071
 ## Validation
 
 - 57 retained helper tests passed, including table/task source transformations and undo/redo history.
+- 64 rendering regression tests passed after updating the table-editing contract assertions.
 - Math/Mermaid smoke checks passed.
-- Editor-transition/zoom and checkbox save/conflict probes passed in the reconciliation copy. Candidate reruns use a fresh absolute compiler-cache path because reusing one cache through two relative paths exposed an Xcode beta compiler-cache collision.
+- Editor-transition/zoom and checkbox save/conflict probes passed in the sanitized candidate using a fresh absolute compiler-cache path.
 - The full Swift suite compiled, but the run was stopped after 136 observed passing test cases and seven failing editor-formatting test cases. The editor Swift source, bundled editor JavaScript and affected test file are unchanged from upstream. A pristine-upstream baseline is still required to attribute the failures conclusively.
-- Xcode project and plist syntax checks passed. Unsigned macOS/Quick Look and generic iOS Simulator builds are being validated; final results will be recorded below.
+- Xcode project and plist syntax checks passed. The unsigned iOS/iPad build succeeded for generic iOS Simulator (arm64 and x86_64). The unsigned macOS Debug build, including Quick Look, also succeeded.
 - No app was installed or launched for interactive testing. No simulator was booted or used. Signing, notarization, publishing and updater services were not exercised.
 
 Failing WebKit cases observed in `EditorFormattingTests`: missing table cells, formatting after blur, table click anchoring, formatting with pipes/whitespace/Unicode/empty cells, stale targets after document replacement, table link/keyboard formatting, and native pointer selection.

@@ -12,8 +12,12 @@
   "static_math_mermaid": "passed",
   "editor_transition_probes": "passed",
   "checkbox_conflict_probes": "passed",
-  "macos_build": "in progress",
-  "ios_generic_simulator_build": "in progress",
+  "macos_build": "passed (Debug, arm64, unsigned; includes Quick Look)",
+  "ios_generic_simulator_build": "passed (arm64 and x86_64, unsigned; no simulator booted)",
   "interactive_validation": "not run",
-  "audit": "No recognized private-key/provider-token pattern matched; heuristic scan limitations and intentional public history described in fork-review.md."
+  "audit": "No recognized private-key/provider-token pattern matched; heuristic scan limitations and intentional public history described in fork-review.md.",
+  "rendering_tests": {
+    "passed": 64,
+    "failed": 0
+  }
 }
